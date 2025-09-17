@@ -3,8 +3,6 @@
 ## Purpose
 Let users upload an item → AI generates optimized eBay listing (title, description, price) → user approves → system posts via eBay API → monitors sale + inbox → drafts responses.
 
----
-
 ## Core Features (MVP)
 
 1. **Auth**
