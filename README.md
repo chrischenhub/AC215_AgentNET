@@ -1,55 +1,139 @@
-# eBay AI Sales Agent (MVP)
+Agent Net MVP Roadmap
+Phase 0 — Foundations (Week 0–1)
+Goal: Get the skeleton of the system up.
+Define the unified manifest schema (JSON format for MCP servers, APIs, true agents).
 
-## Purpose
-Let users upload an item → AI generates optimized eBay listing (title, description, price) → user approves → system posts via eBay API → monitors sale + inbox → drafts responses.
 
-## Core Features (MVP)
+Pick core tech stack:
 
-1. **Auth**
-   - Email login + eBay OAuth.
 
-2. **Item Intake**
-   - Upload photos, enter condition + price range.
-   - Store in DB.
+Backend: Python (FastAPI) or Node.js (Express).
 
-3. **AI Listing Generation**
-   - LLM generates title/description.
-   - Fetch comps via eBay Browse API for price suggestion.
-   - Show draft → user approves/edits.
 
-4. **eBay Integration**
-   - Post listing via Inventory/Trading API.
-   - Sync sale status (sold/delist).
-   - Fetch buyer messages.
+DB: Postgres + pgvector.
 
-5. **Inbox + Messaging**
-   - Display buyer questions in dashboard.
-   - AI drafts replies → user approves/send.
 
-6. **Notifications**
-   - Email/SMS alert for offers/sales.
+Embeddings: OpenAI text-embedding-3-small or open-source (e.g., bge-small).
 
-7. **Audit Logs**
-   - Save AI outputs + user approvals.
 
----
+Set up repo, CI/CD, and simple deployment target (Railway/Render/Heroku).
 
-## Stack (suggested)
-- **Frontend**: React/Next.js
-- **Backend**: Node.js + Express (or FastAPI if Python)
-- **DB**: Postgres
-- **AI**: OpenAI/GPT API for text generation
-- **APIs**: eBay OAuth + Inventory/Trading/Browse/Messaging
-- **Notifications**: SendGrid (email), Twilio (SMS)
 
----
+Deliverable: Empty but running API + DB with manifest schema defined.
 
-## Non-Goals (MVP)
-- Multi-marketplace posting
-- Autonomous negotiation
-- Payments/shipping outside eBay
+Phase 1 — Seed Registry (Week 1–2)
+Goal: Have something searchable.
+Ingest 10–15 MCP-native servers (Stripe, Notion, Perplexity, etc.) → store endpoint + manifest.
 
----
 
-## Success Metric
-- User can: upload item → approve AI draft → see it live on eBay in <5 min
+Manually stub 5–10 non-MCP APIs (Slack, Gmail, FedEx).
+
+
+Add 2–3 “true agents” (simple scripted workflows).
+
+
+Store all in Postgres with embeddings pre-computed.
+
+
+Deliverable: ~20 searchable entries in registry.
+
+Phase 2 — Search API (Week 2–3)
+Goal: Make the index callable by LLMs.
+Implement /search endpoint:
+
+
+Input: { "query": "take notes", "top_k": 5 }
+
+
+Output: ranked list of manifests.
+
+
+Ranking = BM25 + embeddings hybrid.
+
+
+Add simple AgentRank scoring (relevance + trust flag).
+
+
+Test with basic LLM calls (query → get manifest → print result).
+
+
+Deliverable: API that LLMs can query for tool discovery.
+
+Phase 3 — Minimal Web UI (Week 3–4)
+Goal: Human-facing demo surface.
+Build lightweight Next.js app with:
+
+
+Search bar.
+
+
+Result list (name, description, endpoint).
+
+
+Tool details page (manifest, config snippet, “How to use” instructions).
+
+
+Style minimally (think npmjs.org, not fancy).
+
+
+Ensure copy-paste config snippets work in Cursor/Claude Desktop.
+
+
+Deliverable: Demo-ready UI that feels like “Google/NPM for agents.”
+
+Phase 4 — Demo Integration (Week 4–5)
+Goal: Prove end-to-end value.
+Set up a mock runtime (tiny script) that queries Agent Net → retrieves Notion MCP → prints config.
+
+
+Show human flow: “search → copy snippet → paste into Cursor → authenticate → create Notion page.”
+
+
+Polish investor demo with 2–3 canonical use cases:
+
+
+“Take notes” → Notion.
+
+
+“Send payment” → Stripe.
+
+
+“Track package” → FedEx.
+
+
+Deliverable: End-to-end demo showing Agent Net as the discovery layer.
+
+Phase 5 — Stretch / Post-MVP (Optional, Week 6+)
+Crawl MCP Market and auto-ingest MCP servers.
+
+
+Add filters (category, verified, trending).
+
+
+Export configs directly into runtimes (Cursor, LangChain).
+
+
+Collect usage telemetry → feed back into AgentRank.
+
+
+
+Timeline Snapshot
+Week 0–1: Foundations
+
+
+Week 1–2: Seed registry
+
+
+Week 2–3: Search API
+
+
+Week 3–4: Minimal Web UI
+
+
+Week 4–5: Demo integration
+
+
+Week 6+: Stretch
+
+
+
