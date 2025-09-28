@@ -33,3 +33,30 @@
   **Input:**  
   ```json
   { "query": "take notes", "top_k": 5 }
+
+# AgentNET Search CLI
+
+Minimal retrieval utility for browsing MCP agents stored in Data/Agents.json.
+
+## Prerequisites
+- Python 3.10+
+- OpenAI API key in .env (copy .env.example -> .env)
+- Virtual environment recommended
+
+## Installation
+    python -m venv .venv
+    source .venv/bin/activate  # Windows: .venv\Scripts\activate
+    pip install -r requirements.txt
+
+## Ingest Agents
+    python main.py ingest --json Data/Agents.json
+Parses multi-agent (mcp array) or single-agent (agent object) manifests, builds OpenAI embeddings (text-embedding-3-large), and persists them to Chroma at DB/chroma_store.
+
+## Search Catalog
+    python main.py search --q "I want to use Notion"
+Returns the top-3 matches with similarity scores, overlap rationale, endpoint, and leading capabilities.
+
+## Notes
+- Chroma collection name: agents_v1
+- Capabilities and tags are stored in vector metadata for downstream use.
+- Ensure the .env file exists before running commands.
