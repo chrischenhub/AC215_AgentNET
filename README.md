@@ -1,6 +1,6 @@
 # Set Up
 
-## Docker 
+## Docker Onboard
 - create a file named `.env` in the folder root to add the api key into the container
     ```
     OPENAI_API_KEY=xxx
@@ -13,6 +13,26 @@
     ```
     docker compose run --rm agentnet
     ```
+## Project ommand documentation
+- For windows set up docker:
+```
+# build iamge
+docker build -t agentnet-cli .
+
+# run image
+docker run -it --rm --env-file .env -v "${PWD}\DB\chroma_store:/app/DB/chroma_store" agentnet-cli
+
+# Remove all the images built
+docker system prune
+```
+- main.py command
+```
+# build chroma DB
+python main.py ingest --json Data/Agents.json
+
+# Implement RAG search
+main.py search --q "I want to use Notion"
+```
 
 # Agent Net MVP Roadmap
 
