@@ -31,7 +31,7 @@ docker system prune
 python main.py ingest --json Data/Agents.json
 
 # Implement RAG search
-main.py search --q "I want to use Notion"
+python main.py search --q "I want to use Notion"
 ```
 
 # Agent Net MVP Roadmap
