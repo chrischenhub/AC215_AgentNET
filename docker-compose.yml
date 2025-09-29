@@ -1,0 +1,13 @@
+services:
+  agentnet:
+    build: .
+    image: agentnet-cli:latest
+    env_file: .env                 # load env variables into container
+    working_dir: /app
+    volumes:
+      - ./DB/chroma_store:/app/DB/chroma_store   # persist vector store
+      - ./.env:/app/.env:ro                      # (optional) mount .env read-only inside container
+    entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]  # optional wrapper script
+    command: ["/bin/bash"]               # opens interactive shell if using docker compose run
+    tty: true
+    stdin_open: true

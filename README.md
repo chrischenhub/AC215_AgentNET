@@ -1,3 +1,19 @@
+# Set Up
+
+## Docker 
+- create a file named `.env` in the folder root to add the api key into the container
+    ```
+    OPENAI_API_KEY=xxx
+    ```
+- Build image:
+    ```
+    docker compose build agentnet
+    ```
+- Run the docker environment
+    ```
+    docker compose run --rm agentnet
+    ```
+
 # Agent Net MVP Roadmap
 
 ## Phase 0 — Foundations (Week 0–1)
