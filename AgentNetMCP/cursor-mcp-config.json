@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "agentnet": {
+      "command": "node",
+      "args": [
+        "C:/Users/Chris/Documents/GitHub/AgentNetMCP/mcp-server.js"
+      ]
+    }
+  }
+}
