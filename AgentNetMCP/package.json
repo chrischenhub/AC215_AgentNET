@@ -1,7 +1,6 @@
 {
   "name": "agentnetmcp",
   "version": "1.0.0",
-  "type": "module",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -13,6 +12,8 @@
   "dependencies": {
     "express": "^5.1.0",
     "mcp-server": "^0.0.9",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "pg": "^8.11.3",
+    "dotenv": "^16.3.1"
   }
 }

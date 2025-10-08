@@ -1,13 +1,36 @@
 services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: agentnet
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mySecurePassword123
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./DB/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   agentnet:
     build: .
     image: agentnet-cli:latest
-    env_file: .env                 # load env variables into container
+    # env_file: .env                 # load env variables into container
     working_dir: /app
     volumes:
       - ./DB/chroma_store:/app/DB/chroma_store   # persist vector store
-      - ./.env:/app/.env:ro                      # (optional) mount .env read-only inside container
+      # - ./.env:/app/.env:ro                      # (optional) mount .env read-only inside container
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]  # optional wrapper script
     command: ["/bin/bash"]               # opens interactive shell if using docker compose run
     tty: true
     stdin_open: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

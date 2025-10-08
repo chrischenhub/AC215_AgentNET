@@ -1,3 +1,6 @@
+-- Enable pgvector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
 CREATE TABLE agents (
     id TEXT PRIMARY KEY,
     type TEXT NOT NULL,
