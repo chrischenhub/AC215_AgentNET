@@ -1,7 +1,19 @@
-openai
+# Core model + Agents SDK
+openai>=1.40.0
+openai-agents>=0.1.0
+
+# MCP client (protocol support)
+mcp
+
+# Your stack
 langchain
 langchain-community
 langchain-openai
-chromadb
-python-dotenv
 langchain-chroma
+chromadb
+
+# Utils
+python-dotenv>=1.0.1
+jsonschema>=4.22.0
+aiohttp>=3.9.5
+sseclient-py>=1.8.0
