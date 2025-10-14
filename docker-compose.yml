@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -16,16 +18,40 @@ services:
       timeout: 5s
       retries: 5
 
+  # Main dev container for your app/tools (hot reload via bind mount)
   agentnet:
     build: .
     image: agentnet-cli:latest
-    # env_file: .env                 # load env variables into container
     working_dir: /app
+    # Load secrets/tokens
+    env_file:
+      - ./.env
+    # Bind-mount the WHOLE repo so Python edits are visible immediately inside the container
     volumes:
-      - ./DB/chroma_store:/app/DB/chroma_store   # persist vector store
-      # - ./.env:/app/.env:ro                      # (optional) mount .env read-only inside container
-    entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]  # optional wrapper script
-    command: ["/bin/bash"]               # opens interactive shell if using docker compose run
+      - ./:/app
+      # Keep your persistent Chroma store mount too (still points inside /app)
+      - ./DB/chroma_store:/app/DB/chroma_store
+    entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
+    command: ["/bin/bash"]   # drop into a shell; override per-run as needed
+    tty: true
+    stdin_open: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Convenience runner JUST for the Notion agent script.
+  # Same image, same bind mount and env, but a default command to run the agent.
+  # You can override the command at runtime with your own prompt.
+  notion-agent:
+    image: agentnet-cli:latest
+    working_dir: /app
+    env_file:
+      - ./.env
+    volumes:
+      - ./:/app
+    entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
+    # Default command is a harmless help hint; you'll override this when running.
+    command: ["python", "notion_agent.py", "--help"]
     tty: true
     stdin_open: true
     depends_on:
