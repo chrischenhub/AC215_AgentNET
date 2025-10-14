@@ -6,7 +6,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Optional
 
 from dotenv import load_dotenv
 from langchain_chroma import Chroma
@@ -146,6 +146,173 @@ def _format_capabilities(capabilities: Iterable[str]) -> str:
     return "capabilities: " + ", ".join(preview[:3])
 
 
+def _similarity_from_score(score: Optional[float]) -> Optional[float]:
+    if score is None:
+        return None
+    try:
+        value = 1.0 - float(score)
+    except (TypeError, ValueError):
+        return None
+    return max(0.0, min(1.0, value))
+
+
+def _truncate(text: str, limit: int = 400) -> str:
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 3)].rstrip() + "..."
+
+
+def _build_reason_for_agent(query: str, metadata: Dict[str, Any], document: str) -> Optional[str]:
+    if not query:
+        return None
+    caps_list = _metadata_to_list(metadata.get("capabilities", []))
+    tags_list = _metadata_to_list(metadata.get("tags", []))
+    agent_stub = {
+        "name": metadata.get("name", ""),
+        "description": document,
+        "capabilities": caps_list,
+        "tags": tags_list,
+    }
+    return build_reason(query, agent_stub)
+
+
+def _build_agent_meta(metadata: Dict[str, Any], document: str, score: Optional[float], reason: Optional[str]) -> Dict[str, Any]:
+    similarity = _similarity_from_score(score)
+    snippet = _truncate(document)
+    agent_meta: Dict[str, Any] = {
+        "id": metadata.get("id"),
+        "name": metadata.get("name"),
+        "provider": metadata.get("provider"),
+        "endpoint": metadata.get("endpoint"),
+        "capabilities": metadata.get("capabilities", []),
+        "tags": metadata.get("tags", []),
+        "description": metadata.get("description") or document,
+        "document": document,
+        "search_snippet": snippet,
+    }
+    if similarity is not None:
+        agent_meta["similarity"] = similarity
+    if reason:
+        agent_meta["reason"] = reason
+    return agent_meta
+
+
+def _fetch_agent_by_id(vectorstore: Chroma, agent_id: str) -> Optional[Dict[str, Any]]:
+    include = {"include": ["metadatas", "documents"]}
+    record: Optional[Dict[str, Any]] = None
+    try:
+        record = vectorstore.get(ids=[agent_id], **include)
+    except TypeError:
+        record = vectorstore.get(ids=[agent_id])
+    except AttributeError:
+        collection = getattr(vectorstore, "_collection", None)
+        if collection is not None:
+            record = collection.get(ids=[agent_id], **include)
+    except Exception as exc:
+        sys.stderr.write(f"Failed to retrieve agent '{agent_id}': {exc}\n")
+        return None
+    if not record:
+        return None
+    ids = record.get("ids") or []
+    if not ids:
+        return None
+    metadatas = record.get("metadatas") or [{}]
+    documents = record.get("documents") or [""]
+    return {
+        "metadata": metadatas[0] or {},
+        "document": documents[0] or "",
+    }
+
+
+def _select_agent(vectorstore: Chroma, query: str, agent_id: Optional[str]) -> Optional[Dict[str, Any]]:
+    if agent_id:
+        fetched = _fetch_agent_by_id(vectorstore, agent_id)
+        if not fetched:
+            return None
+        metadata = fetched["metadata"]
+        document = fetched["document"]
+        reason = _build_reason_for_agent(query, metadata, document)
+        return _build_agent_meta(metadata, document, score=None, reason=reason)
+    try:
+        results = vectorstore.similarity_search_with_score(query, k=3)
+    except Exception as exc:
+        sys.stderr.write(f"Search failed: {exc}\n")
+        return None
+    if not results:
+        return None
+    doc, score = results[0]
+    metadata = doc.metadata or {}
+    document = doc.page_content or ""
+    reason = _build_reason_for_agent(query, metadata, document)
+    return _build_agent_meta(metadata, document, score=score, reason=reason)
+
+
+def _pretty_print_agent(agent_meta: Dict[str, Any]) -> None:
+    agent_name = agent_meta.get("name") or "<unknown>"
+    agent_id = agent_meta.get("id") or "<unknown>"
+    provider = agent_meta.get("provider")
+    print(f"Selected agent: {agent_name} (id={agent_id})")
+    if provider:
+        print(f"Provider: {provider}")
+    similarity = agent_meta.get("similarity")
+    if isinstance(similarity, (float, int)):
+        print(f"Similarity: {float(similarity):.3f}")
+    reason = agent_meta.get("reason")
+    if isinstance(reason, str) and reason:
+        print(reason)
+    snippet = agent_meta.get("search_snippet")
+    if isinstance(snippet, str) and snippet:
+        print("Snippet:")
+        print(snippet)
+
+
+def _act(query: str, agent_id: Optional[str], dry_run: bool) -> None:
+    _ensure_api_key()
+    vectorstore = get_vectorstore()
+    agent_meta = _select_agent(vectorstore, query, agent_id)
+    if not agent_meta:
+        print("No suitable agent found.")
+        sys.exit(1)
+
+    _pretty_print_agent(agent_meta)
+
+    runner = ActRunner()
+    try:
+        result = runner.run(query, agent_meta, dry_run=dry_run)
+    except Exception as exc:
+        sys.stderr.write(f"Act execution failed: {exc}\n")
+        sys.exit(1)
+
+    if result.get("dry_run"):
+        if "planned_args" in result:
+            tool_name = result.get("tool") or "<unknown>"
+            print(f"Planned tool: {tool_name}")
+            print("Planned arguments:")
+            print(json.dumps(result.get("planned_args", {}), indent=2, ensure_ascii=False))
+        elif "tools" in result:
+            tools = result.get("tools") or []
+            print("Discovered Notion tools:")
+            print(json.dumps(tools, indent=2, ensure_ascii=False))
+        return
+
+    if "final_output" in result:
+        print("Final output:")
+        print(result["final_output"])
+        #return
+
+    tool_name = result.get("tool") or "<unknown>"
+    print(f"Executed tool: {tool_name}")
+    page_url = result.get("page_url")
+    if page_url:
+        print(f"Page URL: {page_url}")
+    page_id = result.get("page_id")
+    if page_id:
+        print(f"Page ID: {page_id}")
+    print("Tool result:")
+    print(json.dumps(result.get("result", {}), indent=2, ensure_ascii=False))
+
+
 def _search(query: str) -> None:
     _ensure_api_key()
     vectorstore = get_vectorstore()
@@ -187,11 +354,18 @@ def main() -> None:
     search_parser = subparsers.add_parser("search", help="Search the agent catalog")
     search_parser.add_argument("--q", required=True, help="Search query")
 
+    act_parser = subparsers.add_parser("act", help="Plan and execute a task via a selected agent")
+    act_parser.add_argument("--q", required=True, help="User task, e.g., 'Create a data structure study plan for me'")
+    act_parser.add_argument("--agent-id", help="Explicit agent id to use (optional)")
+    act_parser.add_argument("--dry-run", action="store_true", help="Plan only, do not execute tools")
+
     args = parser.parse_args()
     if args.command == "ingest":
         _ingest(args.json)
     elif args.command == "search":
         _search(args.q)
+    elif args.command == "act":
+        _act(args.q, agent_id=args.agent_id, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
