@@ -4,369 +4,414 @@ import argparse
 import json
 import os
 import re
-import sys
+import textwrap
+from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any
 
 from dotenv import load_dotenv
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 
-
 COLLECTION_NAME = "agents_v1"
-PERSIST_DIR = "DB/chroma_store"
+PERSIST_DIR = "GCB"
 EMBED_MODEL = "text-embedding-3-large"
+CATALOG_PATH = "Data/mcp_server_tools.json"
+DEFAULT_GCS_BUCKET = "agentnet215"
+DEFAULT_GCS_PREFIX = "chroma_store"
+GCS_PROJECT_ID = "charlesproject-471117"
+
+_TAG_BLOCK_RE = re.compile(r"<[^>]+>(.*?)</[^>]+>", flags=re.DOTALL)
+_TAG_SINGLE_RE = re.compile(r"<[^>/]+(?:/?)>", flags=re.DOTALL)
 
 
-def load_json(path: str) -> Dict[str, Any]:
-    json_path = Path(path)
-    if not json_path.exists():
-        raise FileNotFoundError(f"JSON file not found: {json_path}")
-    with json_path.open("r", encoding="utf-8") as handle:
+@dataclass
+class ToolChunk:
+    server_id: str
+    server_name: str
+    child_link: str
+    tool_name: str
+    tool_slug: str
+    tool_desc: str
+    required_params: list[str]
+    all_params: list[dict[str, Any]]
+    text: str
+
+
+def sanitize_description(desc: str) -> str:
+    if not desc:
+        return ""
+    desc = _TAG_BLOCK_RE.sub(" ", desc)
+    desc = _TAG_SINGLE_RE.sub(" ", desc)
+    return re.sub(r"\s+", " ", desc).strip()
+
+
+def summarize_intent(desc: str, fallback: str = "General purpose tool.") -> str:
+    if not desc:
+        return fallback
+    head = re.split(r"(?<=[.!?])\s+", desc, maxsplit=1)[0] or desc
+    return head[:200].strip()
+
+
+def build_tool_centric_chunks(catalog_json: dict[str, Any]) -> list[ToolChunk]:
+    chunks: list[ToolChunk] = []
+    for srv_key, srv in (catalog_json or {}).items():
+        server_id = str(srv.get("server_id", ""))
+        server_name = srv.get("name", srv_key)
+        child_link = srv.get("child_link", "")
+        for tool in (srv.get("tools") or []):
+            tool_name = (tool.get("name") or "").strip()
+            tool_slug = (tool.get("slug") or "").strip()
+            raw_desc = (tool.get("description") or "").strip()
+            clean_desc = sanitize_description(raw_desc)
+            intent = summarize_intent(clean_desc)
+
+            params = (tool.get("parameters") or []) or []
+            required_params = [
+                (param.get("name") or "").strip()
+                for param in params
+                if param.get("required") is True
+            ]
+
+            def render_signature(param: dict[str, Any]) -> str:
+                name = (param.get("name") or "").strip() or "unnamed"
+                required = "required" if param.get("required") else "optional"
+                param_type = param.get("type")
+                type_str = str(param_type) if param_type is not None else "unknown"
+                return f"{name} ({type_str}, {required})"
+
+            param_sigs = ", ".join(render_signature(param) for param in params) if params else ""
+            headline = f"[Server: {server_name}] [Tool: {tool_name or tool_slug}]"
+            body = f"Use for: {intent or 'General purpose tool.'}"
+            params_line = f"Params: {param_sigs}" if param_sigs else "Params: none"
+            text = "\n".join([headline, body, params_line])
+
+            chunks.append(
+                ToolChunk(
+                    server_id=server_id,
+                    server_name=server_name,
+                    child_link=child_link,
+                    tool_name=tool_name or tool_slug,
+                    tool_slug=tool_slug,
+                    tool_desc=clean_desc,
+                    required_params=required_params,
+                    all_params=params,
+                    text=text,
+                )
+            )
+    return chunks
+
+
+def load_json(path: str) -> dict[str, Any]:
+    with open(path, "r", encoding="utf-8") as handle:
         return json.load(handle)
 
 
-def parse_catalog(obj: Dict[str, Any]) -> List[Dict[str, Any]]:
-    if "mcp" in obj:
-        entries = obj["mcp"] or []
-        agents: List[Dict[str, Any]] = []
-        for entry in entries:
-            agent = entry.get("agent")
-            if agent:
-                agents.append(agent)
-        return agents
-    if "agent" in obj:
-        return [obj["agent"]]
-    raise ValueError("Unsupported catalog format: expected 'mcp' array or 'agent' object")
-
-
-def build_doc(agent: Dict[str, Any]) -> str:
-    name = agent.get("name", "")
-    provider = agent.get("provider", "")
-    description = agent.get("description", "")
-    capabilities = ", ".join(agent.get("capabilities", []) or [])
-    tags = ", ".join(agent.get("tags", []) or [])
-    parts = [name, provider, description, f"capabilities: {capabilities}", f"tags: {tags}"]
-    return "\n".join(part for part in parts if part)
-
-
-def _tokenize(text: str) -> List[str]:
-    return re.findall(r"[a-z0-9]+", text.lower())
-
-
-def build_reason(query: str, agent: Dict[str, Any]) -> str:
-    query_tokens = _tokenize(query)
-    fields = [
-        agent.get("name", ""),
-        agent.get("description", ""),
-        ", ".join(agent.get("capabilities", []) or []),
-        ", ".join(agent.get("tags", []) or []),
-    ]
-    agent_tokens = set()
-    for field in fields:
-        agent_tokens.update(_tokenize(field))
-    overlap: List[str] = []
-    for token in query_tokens:
-        if token in agent_tokens and token not in overlap:
-            overlap.append(token)
-    if not overlap:
-        return "reason: no direct token overlap"
-    quoted = ", ".join(f'"{token}"' for token in overlap[:5])
-    return f"reason: matches {quoted}"
-
-
-def get_vectorstore(persist_dir: str = PERSIST_DIR) -> Chroma:
-    embeddings = OpenAIEmbeddings(model=EMBED_MODEL)
-    return Chroma(collection_name=COLLECTION_NAME, persist_directory=persist_dir, embedding_function=embeddings)
-
-
-def _ensure_api_key() -> None:
-    dotenv_path = Path(".env")
-    if dotenv_path.exists():
-        load_dotenv(dotenv_path=dotenv_path)
-    else:
-        load_dotenv()
-    if not os.getenv("OPENAI_API_KEY"):
-        message = "Missing OPENAI_API_KEY. Create a .env file with OPENAI_API_KEY or export it before running."
-        sys.stderr.write(message + "\n")
-        sys.exit(1)
-
-
-def _join_metadata(values: Iterable[Any]) -> str:
-    items = [str(value).strip() for value in values if value]
-    return ", ".join(items)
-
-
-def _metadata_to_list(raw: Any) -> List[str]:
-    if isinstance(raw, str):
-        return [item.strip() for item in raw.split(',') if item.strip()]
-    if isinstance(raw, Iterable):
-        return [str(item).strip() for item in raw if item]
-    return []
-
-
-def _persist_vectorstore(store: Chroma) -> None:
-    client = getattr(store, "_client", None)
-    if client and hasattr(client, "persist"):
-        client.persist()
-
-
-def _ingest(json_path: str) -> None:
-    _ensure_api_key()
-    payload = load_json(json_path)
-    agents = parse_catalog(payload)
-    if not agents:
-        sys.stderr.write("No agents found in catalog.\n")
-        sys.exit(1)
-
-    docs = [build_doc(agent) for agent in agents]
-    ids = [agent["id"] for agent in agents]
+def index_chunks(catalog_path: str, persist_dir: str) -> tuple[Chroma, int]:
+    catalog = load_json(catalog_path)
+    chunks = build_tool_centric_chunks(catalog)
+    texts = [chunk.text for chunk in chunks]
     metadatas = [
         {
-            "id": agent.get("id"),
-            "name": agent.get("name"),
-            "provider": agent.get("provider"),
-            "endpoint": agent.get("endpoint"),
-            "capabilities": _join_metadata(agent.get("capabilities", []) or []),
-            "tags": _join_metadata(agent.get("tags", []) or []),
+            "server_id": chunk.server_id,
+            "server_name": chunk.server_name,
+            "child_link": chunk.child_link,
+            "tool_slug": chunk.tool_slug,
+            "tool_name": chunk.tool_name,
+            "required_params": ", ".join(chunk.required_params) if chunk.required_params else "",
         }
-        for agent in agents
+        for chunk in chunks
     ]
 
-    vectorstore = get_vectorstore()
-    vectorstore.delete(ids=ids)
-    vectorstore.add_texts(texts=docs, metadatas=metadatas, ids=ids)
-    _persist_vectorstore(vectorstore)
-
-
-def _format_capabilities(capabilities: Iterable[str]) -> str:
-    preview = [item for item in capabilities if item]
-    if not preview:
-        return "capabilities:"
-    return "capabilities: " + ", ".join(preview[:3])
-
-
-def _similarity_from_score(score: Optional[float]) -> Optional[float]:
-    if score is None:
-        return None
     try:
-        value = 1.0 - float(score)
-    except (TypeError, ValueError):
-        return None
-    return max(0.0, min(1.0, value))
+        existing = Chroma(
+            collection_name=COLLECTION_NAME,
+            persist_directory=persist_dir,
+            embedding_function=OpenAIEmbeddings(model=EMBED_MODEL),
+        )
+        existing.delete_collection()
+    except Exception:
+        pass
+
+    embeddings = OpenAIEmbeddings(model=EMBED_MODEL)
+    vectordb = Chroma(
+        collection_name=COLLECTION_NAME,
+        persist_directory=persist_dir,
+        embedding_function=embeddings,
+    )
+    if texts:
+        vectordb.add_texts(texts=texts, metadatas=metadatas)
+        try:
+            vectordb.persist()
+        except AttributeError:
+            client = getattr(vectordb, "_client", None)
+            if client and hasattr(client, "persist"):
+                client.persist()
+    return vectordb, len(texts)
 
 
-def _truncate(text: str, limit: int = 400) -> str:
-    text = (text or "").strip()
-    if len(text) <= limit:
-        return text
-    return text[: max(0, limit - 3)].rstrip() + "..."
-
-
-def _build_reason_for_agent(query: str, metadata: Dict[str, Any], document: str) -> Optional[str]:
-    if not query:
-        return None
-    caps_list = _metadata_to_list(metadata.get("capabilities", []))
-    tags_list = _metadata_to_list(metadata.get("tags", []))
-    agent_stub = {
-        "name": metadata.get("name", ""),
-        "description": document,
-        "capabilities": caps_list,
-        "tags": tags_list,
-    }
-    return build_reason(query, agent_stub)
-
-
-def _build_agent_meta(metadata: Dict[str, Any], document: str, score: Optional[float], reason: Optional[str]) -> Dict[str, Any]:
-    similarity = _similarity_from_score(score)
-    snippet = _truncate(document)
-    agent_meta: Dict[str, Any] = {
-        "id": metadata.get("id"),
-        "name": metadata.get("name"),
-        "provider": metadata.get("provider"),
-        "endpoint": metadata.get("endpoint"),
-        "capabilities": metadata.get("capabilities", []),
-        "tags": metadata.get("tags", []),
-        "description": metadata.get("description") or document,
-        "document": document,
-        "search_snippet": snippet,
-    }
-    if similarity is not None:
-        agent_meta["similarity"] = similarity
-    if reason:
-        agent_meta["reason"] = reason
-    return agent_meta
-
-
-def _fetch_agent_by_id(vectorstore: Chroma, agent_id: str) -> Optional[Dict[str, Any]]:
-    include = {"include": ["metadatas", "documents"]}
-    record: Optional[Dict[str, Any]] = None
+def chroma_persist_exists(persist_dir: str) -> bool:
+    if not os.path.isdir(persist_dir):
+        return False
     try:
-        record = vectorstore.get(ids=[agent_id], **include)
-    except TypeError:
-        record = vectorstore.get(ids=[agent_id])
-    except AttributeError:
-        collection = getattr(vectorstore, "_collection", None)
-        if collection is not None:
-            record = collection.get(ids=[agent_id], **include)
-    except Exception as exc:
-        sys.stderr.write(f"Failed to retrieve agent '{agent_id}': {exc}\n")
-        return None
-    if not record:
-        return None
-    ids = record.get("ids") or []
-    if not ids:
-        return None
-    metadatas = record.get("metadatas") or [{}]
-    documents = record.get("documents") or [""]
-    return {
-        "metadata": metadatas[0] or {},
-        "document": documents[0] or "",
-    }
+        files = set(os.listdir(persist_dir))
+    except Exception:
+        return False
+    return any(filename.startswith("chroma-") for filename in files)
 
 
-def _select_agent(vectorstore: Chroma, query: str, agent_id: Optional[str]) -> Optional[Dict[str, Any]]:
-    if agent_id:
-        fetched = _fetch_agent_by_id(vectorstore, agent_id)
-        if not fetched:
-            return None
-        metadata = fetched["metadata"]
-        document = fetched["document"]
-        reason = _build_reason_for_agent(query, metadata, document)
-        return _build_agent_meta(metadata, document, score=None, reason=reason)
+def try_load_vectordb(persist_dir: str) -> Chroma | None:
     try:
-        results = vectorstore.similarity_search_with_score(query, k=3)
-    except Exception as exc:
-        sys.stderr.write(f"Search failed: {exc}\n")
+        return Chroma(
+            collection_name=COLLECTION_NAME,
+            persist_directory=persist_dir,
+            embedding_function=OpenAIEmbeddings(model=EMBED_MODEL),
+        )
+    except Exception:
         return None
-    if not results:
-        return None
-    doc, score = results[0]
-    metadata = doc.metadata or {}
-    document = doc.page_content or ""
-    reason = _build_reason_for_agent(query, metadata, document)
-    return _build_agent_meta(metadata, document, score=score, reason=reason)
 
 
-def _pretty_print_agent(agent_meta: Dict[str, Any]) -> None:
-    agent_name = agent_meta.get("name") or "<unknown>"
-    agent_id = agent_meta.get("id") or "<unknown>"
-    provider = agent_meta.get("provider")
-    print(f"Selected agent: {agent_name} (id={agent_id})")
-    if provider:
-        print(f"Provider: {provider}")
-    similarity = agent_meta.get("similarity")
-    if isinstance(similarity, (float, int)):
-        print(f"Similarity: {float(similarity):.3f}")
-    reason = agent_meta.get("reason")
-    if isinstance(reason, str) and reason:
-        print(reason)
-    snippet = agent_meta.get("search_snippet")
-    if isinstance(snippet, str) and snippet:
-        print("Snippet:")
-        print(snippet)
-
-
-def _act(query: str, agent_id: Optional[str], dry_run: bool) -> None:
-    _ensure_api_key()
-    vectorstore = get_vectorstore()
-    agent_meta = _select_agent(vectorstore, query, agent_id)
-    if not agent_meta:
-        print("No suitable agent found.")
-        sys.exit(1)
-
-    _pretty_print_agent(agent_meta)
-
-    runner = ActRunner()
-    try:
-        result = runner.run(query, agent_meta, dry_run=dry_run)
-    except Exception as exc:
-        sys.stderr.write(f"Act execution failed: {exc}\n")
-        sys.exit(1)
-
-    if result.get("dry_run"):
-        if "planned_args" in result:
-            tool_name = result.get("tool") or "<unknown>"
-            print(f"Planned tool: {tool_name}")
-            print("Planned arguments:")
-            print(json.dumps(result.get("planned_args", {}), indent=2, ensure_ascii=False))
-        elif "tools" in result:
-            tools = result.get("tools") or []
-            print("Discovered Notion tools:")
-            print(json.dumps(tools, indent=2, ensure_ascii=False))
+def sync_chroma_from_gcs(persist_dir: str) -> None:
+    """
+    Ensure the Chroma store is available locally by downloading it from GCS if needed.
+    """
+    bucket_name = os.getenv("CHROMA_GCS_BUCKET", DEFAULT_GCS_BUCKET)
+    if not bucket_name:
         return
 
-    if "final_output" in result:
-        print("Final output:")
-        print(result["final_output"])
-        #return
+    prefix = os.getenv("CHROMA_GCS_PREFIX", DEFAULT_GCS_PREFIX)
+    project_id = os.getenv("CHROMA_GCS_PROJECT", GCS_PROJECT_ID)
+    local_dir = Path(persist_dir)
 
-    tool_name = result.get("tool") or "<unknown>"
-    print(f"Executed tool: {tool_name}")
-    page_url = result.get("page_url")
-    if page_url:
-        print(f"Page URL: {page_url}")
-    page_id = result.get("page_id")
-    if page_id:
-        print(f"Page ID: {page_id}")
-    print("Tool result:")
-    print(json.dumps(result.get("result", {}), indent=2, ensure_ascii=False))
-
-
-def _search(query: str) -> None:
-    _ensure_api_key()
-    vectorstore = get_vectorstore()
-    results = vectorstore.similarity_search_with_score(query, k=3)
-    if not results:
-        print("No results found.")
+    if chroma_persist_exists(str(local_dir)):
         return
 
-    for index, (doc, score) in enumerate(results, start=1):
+    local_dir.mkdir(parents=True, exist_ok=True)
+
+    credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    if not credentials_path:
+        raise RuntimeError(
+            "Missing GOOGLE_APPLICATION_CREDENTIALS env var required for accessing GCS."
+        )
+    if not Path(credentials_path).exists():
+        raise RuntimeError(
+            f"GOOGLE_APPLICATION_CREDENTIALS points to missing file: {credentials_path}"
+        )
+
+    try:
+        from google.cloud import storage  # type: ignore[import]
+        from google.api_core.exceptions import GoogleAPIError  # type: ignore[import]
+    except ImportError as exc:
+        raise RuntimeError(
+            "google-cloud-storage must be installed to download the Chroma DB from GCS."
+        ) from exc
+
+    client = storage.Client(project=project_id)
+    blobs = client.list_blobs(bucket_name, prefix=prefix)
+
+    synced_any = False
+    for blob in blobs:
+        blob_name = blob.name or ""
+        if not blob_name or blob_name.endswith("/"):
+            continue
+        relative_path = Path(blob_name)
+        if prefix:
+            try:
+                relative_path = relative_path.relative_to(prefix)
+            except ValueError:
+                pass
+        destination = local_dir / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            blob.download_to_filename(str(destination))
+        except GoogleAPIError as exc:
+            raise RuntimeError(
+                f"Failed to download '{blob_name}' from bucket '{bucket_name}'."
+            ) from exc
+        synced_any = True
+
+    if not synced_any:
+        raise RuntimeError(
+            f"No Chroma files found in bucket '{bucket_name}' with prefix '{prefix}'."
+        )
+
+
+def ensure_vectordb(catalog_path: str, persist_dir: str, force_reindex: bool = False) -> Chroma:
+    if not force_reindex:
+        sync_chroma_from_gcs(persist_dir)
+
+    if force_reindex or not chroma_persist_exists(persist_dir):
+        vectordb, _ = index_chunks(catalog_path, persist_dir)
+        return vectordb
+
+    vectordb = try_load_vectordb(persist_dir)
+    if vectordb is None:
+        vectordb, _ = index_chunks(catalog_path, persist_dir)
+        return vectordb
+
+    try:
+        vectordb.similarity_search("probe", k=1)
+    except Exception:
+        vectordb, _ = index_chunks(catalog_path, persist_dir)
+        return vectordb
+
+    return vectordb
+
+
+def score_and_rank_servers(
+    query: str,
+    vectordb: Chroma,
+    k_tools: int = 12,
+    top_servers: int = 3,
+) -> list[dict[str, Any]]:
+    docs = vectordb.similarity_search(query, k=k_tools)
+
+    grouped: dict[str, dict[str, Any]] = defaultdict(lambda: {"score": 0.0, "docs": []})
+    for rank, doc in enumerate(docs, start=1):
         metadata = doc.metadata or {}
-        similarity = max(0.0, min(1.0, 1.0 - float(score)))
-        name = metadata.get("name", "")
-        provider = metadata.get("provider", "")
-        agent_id = metadata.get("id", "")
-        endpoint = metadata.get("endpoint", "")
-        caps_list = _metadata_to_list(metadata.get("capabilities", []))
-        tags_list = _metadata_to_list(metadata.get("tags", []))
-        reason = build_reason(query, {
-            "name": name,
-            "description": doc.page_content,
-            "capabilities": caps_list,
-            "tags": tags_list,
-        })
-        print(f"[{index}] {name} — {provider}  score={similarity:.3f}  (id={agent_id})")
-        print(f"    {reason}")
-        if endpoint:
-            print(f"    endpoint: {endpoint}")
-        caps_line = _format_capabilities(caps_list)
-        print(f"    {caps_line}")
+        server_name = metadata.get("server_name", "")
+        if not server_name:
+            continue
+        weight = 1.0 / rank
+        grouped[server_name]["score"] += weight
+        grouped[server_name]["docs"].append(doc)
+
+    def reason_for_server(items: list) -> str:
+        lines: list[str] = []
+        for doc in items[:3]:
+            metadata = doc.metadata or {}
+            tool = metadata.get("tool_name") or metadata.get("tool_slug") or "tool"
+            intent = ""
+            if doc.page_content:
+                parts = doc.page_content.splitlines()
+                if len(parts) >= 2:
+                    intent = parts[1].replace("Use for: ", "").strip()
+            lines.append(f"{tool}: {intent}" if intent else tool)
+        summary = "; ".join(line for line in lines if line)
+        return textwrap.shorten(summary or "Relevant tools available.", width=300, placeholder="...")
+
+    ranked = sorted(grouped.items(), key=lambda item: item[1]["score"], reverse=True)[:top_servers]
+    results: list[dict[str, Any]] = []
+    for server_name, bundle in ranked:
+        child_link = next(
+            (
+                doc.metadata.get("child_link", "")
+                for doc in bundle["docs"]
+                if doc.metadata and doc.metadata.get("child_link")
+            ),
+            "",
+        )
+        results.append(
+            {
+                "server": server_name,
+                "child_link": child_link,
+                "score": round(bundle["score"], 4),
+                "why": reason_for_server(bundle["docs"]),
+            }
+        )
+    return results
+
+
+def ensure_api_key() -> None:
+    if not os.getenv("OPENAI_API_KEY"):
+        raise RuntimeError("Missing OPENAI_API_KEY. Set it in your environment or .env file.")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="RAG-only CLI for building and querying the MCP server vector store."
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    ingest_parser = subparsers.add_parser(
+        "ingest",
+        help="Chunk catalog JSON and persist the Chroma vector store.",
+    )
+    ingest_parser.add_argument(
+        "--json",
+        required=True,
+        help="Path to the MCP server catalog JSON document.",
+    )
+    ingest_parser.add_argument(
+        "--persist-dir",
+        default=PERSIST_DIR,
+        help=f"Directory to persist the Chroma DB (default: {PERSIST_DIR}).",
+    )
+
+    search_parser = subparsers.add_parser(
+        "search",
+        help="Retrieve and rank servers for a natural language query.",
+    )
+    search_parser.add_argument(
+        "--q",
+        required=True,
+        help="User task or intent in natural language.",
+    )
+    search_parser.add_argument(
+        "--persist-dir",
+        default=PERSIST_DIR,
+        help=f"Directory containing the Chroma DB (default: {PERSIST_DIR}).",
+    )
+    search_parser.add_argument(
+        "--catalog",
+        help="Optional path to rebuild the store if missing or corrupt.",
+    )
+    search_parser.add_argument(
+        "--reindex",
+        action="store_true",
+        help="Force rebuild the vector store before searching.",
+    )
+    search_parser.add_argument(
+        "--k-tools",
+        type=int,
+        default=12,
+        help="Number of tool chunks to retrieve before aggregation (default: 12).",
+    )
+    search_parser.add_argument(
+        "--top-servers",
+        type=int,
+        default=3,
+        help="Number of servers to return (default: 3).",
+    )
+
+    return parser.parse_args()
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="AgentNET search utility")
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    load_dotenv()
+    args = parse_args()
 
-    ingest_parser = subparsers.add_parser("ingest", help="Ingest agents into Chroma")
-    ingest_parser.add_argument("--json", required=True, help="Path to agents JSON file")
+    ensure_api_key()
 
-    search_parser = subparsers.add_parser("search", help="Search the agent catalog")
-    search_parser.add_argument("--q", required=True, help="Search query")
-
-    act_parser = subparsers.add_parser("act", help="Plan and execute a task via a selected agent")
-    act_parser.add_argument("--q", required=True, help="User task, e.g., 'Create a data structure study plan for me'")
-    act_parser.add_argument("--agent-id", help="Explicit agent id to use (optional)")
-    act_parser.add_argument("--dry-run", action="store_true", help="Plan only, do not execute tools")
-
-    args = parser.parse_args()
     if args.command == "ingest":
-        _ingest(args.json)
-    elif args.command == "search":
-        _search(args.q)
-    elif args.command == "act":
-        _act(args.q, agent_id=args.agent_id, dry_run=args.dry_run)
+        _, chunk_count = index_chunks(args.json, args.persist_dir)
+        print(
+            json.dumps(
+                {
+                    "collection": COLLECTION_NAME,
+                    "persist_dir": args.persist_dir,
+                    "chunks_indexed": chunk_count,
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
+        return
+
+    if args.command == "search":
+        catalog_path = args.catalog or os.getenv("MCP_SERVER_CATALOG_PATH", CATALOG_PATH)
+        vectordb = ensure_vectordb(catalog_path, args.persist_dir, force_reindex=args.reindex)
+        results = score_and_rank_servers(
+            args.q,
+            vectordb,
+            k_tools=args.k_tools,
+            top_servers=args.top_servers,
+        )
+        output_key = "top_3_servers" if args.top_servers == 3 else "top_servers"
+        print(json.dumps({output_key: results}, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":
     main()
+

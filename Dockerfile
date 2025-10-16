@@ -3,7 +3,8 @@ FROM python:3.12-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    POETRY_VIRTUALENVS_CREATE=0
+    POETRY_VIRTUALENVS_CREATE=0 \
+    GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/service-account.json
 
 # ---------- OS deps ----------
 # Keep Node.js (useful if you later test stdio MCPs via npx), plus build tools for native wheels
