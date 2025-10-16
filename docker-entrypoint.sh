@@ -27,15 +27,15 @@ maybe_pip_install() {
     cur="$(sha256sum "$req" | awk '{print $1}')"
 
     if [[ ! -f "$stamp" ]] || [[ "$(<"$stamp")" != "$cur" ]]; then
-      log "Detected new/changed requirements.txt — installing Python deps..."
+      log "Detected new/changed requirements.txt - installing Python deps..."
       python -m pip install --no-cache-dir -r "$req"
       echo "$cur" > "$stamp"
       log "Python deps installed."
     else
-      log "requirements.txt unchanged — skipping pip install."
+      log "requirements.txt unchanged - skipping pip install."
     fi
   else
-    log "No /app/requirements.txt found — skipping pip install."
+    log "No /app/requirements.txt found - skipping pip install."
   fi
 }
 

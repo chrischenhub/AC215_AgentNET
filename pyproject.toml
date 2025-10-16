@@ -1,0 +1,28 @@
+[project]
+name = "agentnet"
+version = "0.1.0"
+description = "AgentNet tooling and agents for working with OpenAI MCP integrations."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "openai>=1.40.0",
+    "openai-agents>=0.1.0",
+    "mcp",
+    "langchain",
+    "langchain-community",
+    "langchain-openai",
+    "langchain-chroma",
+    "chromadb",
+    "python-dotenv>=1.0.1",
+    "jsonschema>=4.22.0",
+    "aiohttp>=3.9.5",
+    "sseclient-py>=1.8.0",
+    "google-cloud-storage>=2.17.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+managed = true

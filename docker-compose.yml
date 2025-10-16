@@ -1,4 +1,13 @@
-version: "3.9"
+x-agentnet-image: &agentnet-image ${AGENTNET_IMAGE:-agentnet-cli}:${AGENTNET_IMAGE_TAG:-latest}
+x-agentnet-base: &agentnet-base
+  image: *agentnet-image
+  platform: ${AGENTNET_PLATFORM:-linux/amd64}
+  working_dir: /app
+  volumes:
+    - ./:/app
+  entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
+  tty: true
+  stdin_open: true
 
 services:
   postgres:
@@ -11,52 +20,35 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./DB/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./DB/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d agentnet"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
-  # Main dev container for your app/tools (hot reload via bind mount)
   agentnet:
-    build: .
-    image: agentnet-cli:latest
-    working_dir: /app
-    # Load secrets/tokens
-    env_file:
-      - ./.env
-    # Bind-mount the WHOLE repo so Python edits are visible immediately inside the container
+    <<: *agentnet-base
+    build:
+      context: .
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
       - ./:/app
-      # Keep your persistent Chroma store mount too (still points inside /app)
       - ./DB/chroma_store:/app/DB/chroma_store
-    entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
-    command: ["/bin/bash"]   # drop into a shell; override per-run as needed
-    tty: true
-    stdin_open: true
-    depends_on:
-      postgres:
-        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:mySecurePassword123@postgres:5432/agentnet
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
 
-  # Convenience runner JUST for the Notion agent script.
-  # Same image, same bind mount and env, but a default command to run the agent.
-  # You can override the command at runtime with your own prompt.
   notion-agent:
-    image: agentnet-cli:latest
-    working_dir: /app
-    env_file:
-      - ./.env
-    volumes:
-      - ./:/app
-    entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
-    # Default command is a harmless help hint; you'll override this when running.
+    <<: *agentnet-base
+    build:
+      context: .
+    profiles: ["notion"]
     command: ["python", "notion_agent.py", "--help"]
-    tty: true
-    stdin_open: true
-    depends_on:
-      postgres:
-        condition: service_healthy
 
 volumes:
   postgres_data:
