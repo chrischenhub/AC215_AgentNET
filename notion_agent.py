@@ -20,30 +20,37 @@ Environment variables:
   - OPENAI_MODEL         : (optional) Model id; defaults to 'openai:gpt-4o'
 """
 
+import argparse
+import asyncio
 import os
 import sys
-import asyncio
+from typing import Optional
 from urllib.parse import urlencode
 
 from agents import Agent, Runner
 from agents.mcp import MCPServerStreamableHttp
 from agents.model_settings import ModelSettings
 
+DEFAULT_NOTION_MCP_BASE_URL = "https://server.smithery.ai/notion/mcp"
 
-def build_smithery_notion_url() -> str:
+
+def build_smithery_notion_url(
+    base_url: Optional[str] = None,
+    smithery_api_key: Optional[str] = None,
+) -> str:
     """
     Construct the Streamable HTTP URL to Smithery's hosted Notion MCP.
     Smithery commonly uses a query string with an api_key; keep it simple by default.
     """
-    base_url = os.environ.get("NOTION_MCP_BASE_URL", "https://server.smithery.ai/notion/mcp")
-    smithery_api_key = os.environ.get("SMITHERY_API_KEY")
+    resolved_base_url = base_url or os.environ.get("NOTION_MCP_BASE_URL", DEFAULT_NOTION_MCP_BASE_URL)
+    smithery_api_key = smithery_api_key or os.environ.get("SMITHERY_API_KEY")
     if not smithery_api_key:
         raise RuntimeError("SMITHERY_API_KEY is required.")
     params = {"api_key": smithery_api_key}
 
     # If your Smithery setup expects additional parameters (e.g., profile/config),
     # you can extend the query params here. For many setups, api_key alone is sufficient.
-    return f"{base_url}?{urlencode(params)}"
+    return f"{resolved_base_url}?{urlencode(params)}"
 
 
 def build_agent(notion_url: str, parent_id: str | None) -> Agent:
@@ -86,36 +93,63 @@ def build_agent(notion_url: str, parent_id: str | None) -> Agent:
     )
 
 
-async def main() -> None:
-    if len(sys.argv) < 2:
-        print("Please provide a user request, e.g.:")
-        print("  python notion_agent.py \"Create a page for 'Data Structures Study Plan' ...\"")
-        sys.exit(1)
-
-    user_request = sys.argv[1]
-
-    # Required env
+async def run_notion_task(
+    user_request: str,
+    *,
+    notion_mcp_base_url: Optional[str] = None,
+    parent_id: Optional[str] = None,
+) -> str:
     if not os.environ.get("OPENAI_API_KEY"):
         raise RuntimeError("OPENAI_API_KEY is required.")
 
-    # Optional default parent
-    parent_id = os.environ.get("NOTION_PARENT_ID")
+    notion_url = build_smithery_notion_url(notion_mcp_base_url)
 
-    # Build Notion MCP URL (Smithery)
-    notion_url = build_smithery_notion_url()
+    print(f"\nConnected MCP server: {notion_url}")
+    prompt = (
+        "Describe exactly what you want the Notion agent to do.\n"
+        "Press Enter to reuse the previous instruction: "
+    )
+    clarified_request = input(prompt).strip()
+    task_instruction = clarified_request or user_request
 
-    # Build agent + open a managed connection to the remote MCP server
     agent = build_agent(notion_url, parent_id)
 
-    # Use the MCP server as an async context manager so connections cleanly close.
-    # The Agent SDK handles the Streamable HTTP handshake & tool listing behind the scenes.
-    # (See "Streamable HTTP MCP servers" in the Agents SDK docs.)
     async with agent.mcp_servers[0]:
-        result = await Runner.run(agent, user_request)
-        # Result surfaces the model's final answer; tool execution happens transparently in the run.
-        print("\n=== Agent Response ===\n")
-        print(getattr(result, "final_output", result))
+        result = await Runner.run(agent, task_instruction)
+    return str(getattr(result, "final_output", result))
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Call the Notion MCP via Smithery using the OpenAI Agents SDK."
+    )
+    parser.add_argument(
+        "user_request",
+        help="Instruction for the Notion agent to execute.",
+    )
+    parser.add_argument(
+        "--url",
+        dest="notion_mcp_base_url",
+        help="Override the Smithery Notion MCP base URL.",
+    )
+    return parser.parse_args(argv)
+
+
+async def main_async(argv: list[str] | None = None) -> None:
+    args = parse_args(argv or sys.argv[1:])
+    parent_id = os.environ.get("NOTION_PARENT_ID")
+    final_output = await run_notion_task(
+        args.user_request,
+        notion_mcp_base_url=args.notion_mcp_base_url,
+        parent_id=parent_id,
+    )
+    print("\n=== Agent Response ===\n")
+    print(final_output)
+
+
+def main() -> None:
+    asyncio.run(main_async())
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

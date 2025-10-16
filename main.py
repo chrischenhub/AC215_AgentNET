@@ -1,417 +1,139 @@
 from __future__ import annotations
 
 import argparse
-import json
-import os
-import re
-import textwrap
-from collections import defaultdict
-from dataclasses import dataclass
-from pathlib import Path
+import asyncio
 from typing import Any
 
-from dotenv import load_dotenv
-from langchain_chroma import Chroma
-from langchain_openai import OpenAIEmbeddings
+from RAG import PERSIST_DIR as DEFAULT_PERSIST_DIR, search_servers
+from notion_agent import run_notion_task
 
-COLLECTION_NAME = "agents_v1"
-PERSIST_DIR = "GCB"
-EMBED_MODEL = "text-embedding-3-large"
-CATALOG_PATH = "Data/mcp_server_tools.json"
-DEFAULT_GCS_BUCKET = "agentnet215"
-DEFAULT_GCS_PREFIX = "chroma_store"
-GCS_PROJECT_ID = "charlesproject-471117"
-
-_TAG_BLOCK_RE = re.compile(r"<[^>]+>(.*?)</[^>]+>", flags=re.DOTALL)
-_TAG_SINGLE_RE = re.compile(r"<[^>/]+(?:/?)>", flags=re.DOTALL)
+DEFAULT_TOP_SERVERS = 3
+DEFAULT_K_TOOLS = 12
 
 
-@dataclass
-class ToolChunk:
-    server_id: str
-    server_name: str
-    child_link: str
-    tool_name: str
-    tool_slug: str
-    tool_desc: str
-    required_params: list[str]
-    all_params: list[dict[str, Any]]
-    text: str
+def derive_mcp_url(child_link: str) -> str:
+    """
+    Build the Smithery MCP endpoint from a catalog child link.
+    Example: /server/notion -> https://server.smithery.ai/notion/mcp
+    """
+    if not child_link:
+        raise ValueError("Child link is required to derive the MCP URL.")
+
+    trimmed = child_link.strip()
+    if trimmed.startswith("/server"):
+        trimmed = trimmed[len("/server") :]
+    trimmed = trimmed.strip("/")
+    if not trimmed:
+        raise ValueError(f"Unable to derive MCP path from child link: {child_link}")
+    return f"https://server.smithery.ai/{trimmed}/mcp"
 
 
-def sanitize_description(desc: str) -> str:
-    if not desc:
-        return ""
-    desc = _TAG_BLOCK_RE.sub(" ", desc)
-    desc = _TAG_SINGLE_RE.sub(" ", desc)
-    return re.sub(r"\s+", " ", desc).strip()
+def prompt_for_selection(results: list[dict[str, Any]]) -> dict[str, Any]:
+    """
+    Present ranked servers and ask the user to pick one.
+    """
+    print("\nTop RAG matches:\n")
+    for idx, item in enumerate(results, start=1):
+        server = item.get("server", "unknown")
+        score = item.get("score")
+        why = item.get("why", "")
+        child_link = item.get("child_link", "")
+        print(f"{idx}. {server} (score: {score})")
+        print(f"   child_link: {child_link}")
+        if why:
+            print(f"   why: {why}")
+        print()
 
-
-def summarize_intent(desc: str, fallback: str = "General purpose tool.") -> str:
-    if not desc:
-        return fallback
-    head = re.split(r"(?<=[.!?])\s+", desc, maxsplit=1)[0] or desc
-    return head[:200].strip()
-
-
-def build_tool_centric_chunks(catalog_json: dict[str, Any]) -> list[ToolChunk]:
-    chunks: list[ToolChunk] = []
-    for srv_key, srv in (catalog_json or {}).items():
-        server_id = str(srv.get("server_id", ""))
-        server_name = srv.get("name", srv_key)
-        child_link = srv.get("child_link", "")
-        for tool in (srv.get("tools") or []):
-            tool_name = (tool.get("name") or "").strip()
-            tool_slug = (tool.get("slug") or "").strip()
-            raw_desc = (tool.get("description") or "").strip()
-            clean_desc = sanitize_description(raw_desc)
-            intent = summarize_intent(clean_desc)
-
-            params = (tool.get("parameters") or []) or []
-            required_params = [
-                (param.get("name") or "").strip()
-                for param in params
-                if param.get("required") is True
-            ]
-
-            def render_signature(param: dict[str, Any]) -> str:
-                name = (param.get("name") or "").strip() or "unnamed"
-                required = "required" if param.get("required") else "optional"
-                param_type = param.get("type")
-                type_str = str(param_type) if param_type is not None else "unknown"
-                return f"{name} ({type_str}, {required})"
-
-            param_sigs = ", ".join(render_signature(param) for param in params) if params else ""
-            headline = f"[Server: {server_name}] [Tool: {tool_name or tool_slug}]"
-            body = f"Use for: {intent or 'General purpose tool.'}"
-            params_line = f"Params: {param_sigs}" if param_sigs else "Params: none"
-            text = "\n".join([headline, body, params_line])
-
-            chunks.append(
-                ToolChunk(
-                    server_id=server_id,
-                    server_name=server_name,
-                    child_link=child_link,
-                    tool_name=tool_name or tool_slug,
-                    tool_slug=tool_slug,
-                    tool_desc=clean_desc,
-                    required_params=required_params,
-                    all_params=params,
-                    text=text,
-                )
-            )
-    return chunks
-
-
-def load_json(path: str) -> dict[str, Any]:
-    with open(path, "r", encoding="utf-8") as handle:
-        return json.load(handle)
-
-
-def index_chunks(catalog_path: str, persist_dir: str) -> tuple[Chroma, int]:
-    catalog = load_json(catalog_path)
-    chunks = build_tool_centric_chunks(catalog)
-    texts = [chunk.text for chunk in chunks]
-    metadatas = [
-        {
-            "server_id": chunk.server_id,
-            "server_name": chunk.server_name,
-            "child_link": chunk.child_link,
-            "tool_slug": chunk.tool_slug,
-            "tool_name": chunk.tool_name,
-            "required_params": ", ".join(chunk.required_params) if chunk.required_params else "",
-        }
-        for chunk in chunks
-    ]
-
+    # Assume the user chooses a valid index; default to 1 on empty input.
+    raw_choice = input(f"Select a server to use [1-{len(results)}] (default: 1): ").strip()
     try:
-        existing = Chroma(
-            collection_name=COLLECTION_NAME,
-            persist_directory=persist_dir,
-            embedding_function=OpenAIEmbeddings(model=EMBED_MODEL),
-        )
-        existing.delete_collection()
-    except Exception:
-        pass
+        choice = 1 if not raw_choice else int(raw_choice)
+    except ValueError as exc:
+        raise ValueError(f"Invalid selection: {raw_choice}") from exc
+    if choice < 1 or choice > len(results):
+        raise ValueError(f"Selection {choice} is out of range.")
+    return results[choice - 1]
 
-    embeddings = OpenAIEmbeddings(model=EMBED_MODEL)
-    vectordb = Chroma(
-        collection_name=COLLECTION_NAME,
-        persist_directory=persist_dir,
-        embedding_function=embeddings,
+
+async def run_workflow(args: argparse.Namespace) -> None:
+    results = search_servers(
+        args.query,
+        args.persist_dir,
+        catalog_path=args.catalog,
+        top_servers=args.top_servers,
+        k_tools=args.k_tools,
+        force_reindex=args.reindex,
     )
-    if texts:
-        vectordb.add_texts(texts=texts, metadatas=metadatas)
-        try:
-            vectordb.persist()
-        except AttributeError:
-            client = getattr(vectordb, "_client", None)
-            if client and hasattr(client, "persist"):
-                client.persist()
-    return vectordb, len(texts)
-
-
-def chroma_persist_exists(persist_dir: str) -> bool:
-    if not os.path.isdir(persist_dir):
-        return False
-    try:
-        files = set(os.listdir(persist_dir))
-    except Exception:
-        return False
-    return any(filename.startswith("chroma-") for filename in files)
-
-
-def try_load_vectordb(persist_dir: str) -> Chroma | None:
-    try:
-        return Chroma(
-            collection_name=COLLECTION_NAME,
-            persist_directory=persist_dir,
-            embedding_function=OpenAIEmbeddings(model=EMBED_MODEL),
-        )
-    except Exception:
-        return None
-
-
-def sync_chroma_from_gcs(persist_dir: str) -> None:
-    """
-    Ensure the Chroma store is available locally by downloading it from GCS if needed.
-    """
-    bucket_name = os.getenv("CHROMA_GCS_BUCKET", DEFAULT_GCS_BUCKET)
-    if not bucket_name:
+    if not results:
+        print("No matching servers found.")
         return
 
-    prefix = os.getenv("CHROMA_GCS_PREFIX", DEFAULT_GCS_PREFIX)
-    project_id = os.getenv("CHROMA_GCS_PROJECT", GCS_PROJECT_ID)
-    local_dir = Path(persist_dir)
-
-    if chroma_persist_exists(str(local_dir)):
+    try:
+        chosen = prompt_for_selection(results)
+    except ValueError as exc:
+        print(f"Selection error: {exc}")
         return
+    server_name = chosen.get("server", "unknown")
+    child_link = chosen.get("child_link", "")
+    notion_instruction = args.notion_instruction or args.query
 
-    local_dir.mkdir(parents=True, exist_ok=True)
+    mcp_url = derive_mcp_url(child_link)
+    print(f"\nUsing server '{server_name}' with MCP endpoint: {mcp_url}")
 
-    credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-    if not credentials_path:
-        raise RuntimeError(
-            "Missing GOOGLE_APPLICATION_CREDENTIALS env var required for accessing GCS."
-        )
-    if not Path(credentials_path).exists():
-        raise RuntimeError(
-            f"GOOGLE_APPLICATION_CREDENTIALS points to missing file: {credentials_path}"
-        )
+    final_output = await run_notion_task(
+        notion_instruction,
+        notion_mcp_base_url=mcp_url,
+    )
 
-    try:
-        from google.cloud import storage  # type: ignore[import]
-        from google.api_core.exceptions import GoogleAPIError  # type: ignore[import]
-    except ImportError as exc:
-        raise RuntimeError(
-            "google-cloud-storage must be installed to download the Chroma DB from GCS."
-        ) from exc
-
-    client = storage.Client(project=project_id)
-    blobs = client.list_blobs(bucket_name, prefix=prefix)
-
-    synced_any = False
-    for blob in blobs:
-        blob_name = blob.name or ""
-        if not blob_name or blob_name.endswith("/"):
-            continue
-        relative_path = Path(blob_name)
-        if prefix:
-            try:
-                relative_path = relative_path.relative_to(prefix)
-            except ValueError:
-                pass
-        destination = local_dir / relative_path
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            blob.download_to_filename(str(destination))
-        except GoogleAPIError as exc:
-            raise RuntimeError(
-                f"Failed to download '{blob_name}' from bucket '{bucket_name}'."
-            ) from exc
-        synced_any = True
-
-    if not synced_any:
-        raise RuntimeError(
-            f"No Chroma files found in bucket '{bucket_name}' with prefix '{prefix}'."
-        )
-
-
-def ensure_vectordb(catalog_path: str, persist_dir: str, force_reindex: bool = False) -> Chroma:
-    if not force_reindex:
-        sync_chroma_from_gcs(persist_dir)
-
-    if force_reindex or not chroma_persist_exists(persist_dir):
-        vectordb, _ = index_chunks(catalog_path, persist_dir)
-        return vectordb
-
-    vectordb = try_load_vectordb(persist_dir)
-    if vectordb is None:
-        vectordb, _ = index_chunks(catalog_path, persist_dir)
-        return vectordb
-
-    try:
-        vectordb.similarity_search("probe", k=1)
-    except Exception:
-        vectordb, _ = index_chunks(catalog_path, persist_dir)
-        return vectordb
-
-    return vectordb
-
-
-def score_and_rank_servers(
-    query: str,
-    vectordb: Chroma,
-    k_tools: int = 12,
-    top_servers: int = 3,
-) -> list[dict[str, Any]]:
-    docs = vectordb.similarity_search(query, k=k_tools)
-
-    grouped: dict[str, dict[str, Any]] = defaultdict(lambda: {"score": 0.0, "docs": []})
-    for rank, doc in enumerate(docs, start=1):
-        metadata = doc.metadata or {}
-        server_name = metadata.get("server_name", "")
-        if not server_name:
-            continue
-        weight = 1.0 / rank
-        grouped[server_name]["score"] += weight
-        grouped[server_name]["docs"].append(doc)
-
-    def reason_for_server(items: list) -> str:
-        lines: list[str] = []
-        for doc in items[:3]:
-            metadata = doc.metadata or {}
-            tool = metadata.get("tool_name") or metadata.get("tool_slug") or "tool"
-            intent = ""
-            if doc.page_content:
-                parts = doc.page_content.splitlines()
-                if len(parts) >= 2:
-                    intent = parts[1].replace("Use for: ", "").strip()
-            lines.append(f"{tool}: {intent}" if intent else tool)
-        summary = "; ".join(line for line in lines if line)
-        return textwrap.shorten(summary or "Relevant tools available.", width=300, placeholder="...")
-
-    ranked = sorted(grouped.items(), key=lambda item: item[1]["score"], reverse=True)[:top_servers]
-    results: list[dict[str, Any]] = []
-    for server_name, bundle in ranked:
-        child_link = next(
-            (
-                doc.metadata.get("child_link", "")
-                for doc in bundle["docs"]
-                if doc.metadata and doc.metadata.get("child_link")
-            ),
-            "",
-        )
-        results.append(
-            {
-                "server": server_name,
-                "child_link": child_link,
-                "score": round(bundle["score"], 4),
-                "why": reason_for_server(bundle["docs"]),
-            }
-        )
-    return results
-
-
-def ensure_api_key() -> None:
-    if not os.getenv("OPENAI_API_KEY"):
-        raise RuntimeError("Missing OPENAI_API_KEY. Set it in your environment or .env file.")
+    print("\n=== Notion Agent Output ===\n")
+    print(final_output)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="RAG-only CLI for building and querying the MCP server vector store."
+        description="Run a RAG search, select an MCP server, and execute a Notion task."
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    ingest_parser = subparsers.add_parser(
-        "ingest",
-        help="Chunk catalog JSON and persist the Chroma vector store.",
+    parser.add_argument(
+        "query",
+        help="Natural language query used for the RAG search (and default Notion instruction).",
     )
-    ingest_parser.add_argument(
-        "--json",
-        required=True,
-        help="Path to the MCP server catalog JSON document.",
+    parser.add_argument(
+        "--notion-instruction",
+        help="Explicit instruction to send to the Notion agent (defaults to the query).",
     )
-    ingest_parser.add_argument(
+    parser.add_argument(
         "--persist-dir",
-        default=PERSIST_DIR,
-        help=f"Directory to persist the Chroma DB (default: {PERSIST_DIR}).",
+        default=DEFAULT_PERSIST_DIR,
+        help=f"Location of the Chroma DB (default: {DEFAULT_PERSIST_DIR}).",
     )
-
-    search_parser = subparsers.add_parser(
-        "search",
-        help="Retrieve and rank servers for a natural language query.",
-    )
-    search_parser.add_argument(
-        "--q",
-        required=True,
-        help="User task or intent in natural language.",
-    )
-    search_parser.add_argument(
-        "--persist-dir",
-        default=PERSIST_DIR,
-        help=f"Directory containing the Chroma DB (default: {PERSIST_DIR}).",
-    )
-    search_parser.add_argument(
+    parser.add_argument(
         "--catalog",
-        help="Optional path to rebuild the store if missing or corrupt.",
+        help="Optional catalog path override when rebuilding the vector store.",
     )
-    search_parser.add_argument(
+    parser.add_argument(
         "--reindex",
         action="store_true",
-        help="Force rebuild the vector store before searching.",
+        help="Force rebuild of the vector store before searching.",
     )
-    search_parser.add_argument(
-        "--k-tools",
-        type=int,
-        default=12,
-        help="Number of tool chunks to retrieve before aggregation (default: 12).",
-    )
-    search_parser.add_argument(
+    parser.add_argument(
         "--top-servers",
         type=int,
-        default=3,
-        help="Number of servers to return (default: 3).",
+        default=DEFAULT_TOP_SERVERS,
+        help=f"How many servers to display (default: {DEFAULT_TOP_SERVERS}).",
     )
-
+    parser.add_argument(
+        "--k-tools",
+        type=int,
+        default=DEFAULT_K_TOOLS,
+        help=f"Number of tool chunks to retrieve (default: {DEFAULT_K_TOOLS}).",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
-    load_dotenv()
     args = parse_args()
-
-    ensure_api_key()
-
-    if args.command == "ingest":
-        _, chunk_count = index_chunks(args.json, args.persist_dir)
-        print(
-            json.dumps(
-                {
-                    "collection": COLLECTION_NAME,
-                    "persist_dir": args.persist_dir,
-                    "chunks_indexed": chunk_count,
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
-        )
-        return
-
-    if args.command == "search":
-        catalog_path = args.catalog or os.getenv("MCP_SERVER_CATALOG_PATH", CATALOG_PATH)
-        vectordb = ensure_vectordb(catalog_path, args.persist_dir, force_reindex=args.reindex)
-        results = score_and_rank_servers(
-            args.q,
-            vectordb,
-            k_tools=args.k_tools,
-            top_servers=args.top_servers,
-        )
-        output_key = "top_3_servers" if args.top_servers == 3 else "top_servers"
-        print(json.dumps({output_key: results}, indent=2, ensure_ascii=False))
+    asyncio.run(run_workflow(args))
 
 
 if __name__ == "__main__":
     main()
-

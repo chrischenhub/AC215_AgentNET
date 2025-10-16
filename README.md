@@ -31,7 +31,7 @@ docker system prune
 python main.py ingest --json Data/Agents.json
 
 # Implement RAG search
-python main.py search --q "I want to use Notion"
+python main.py search --q "I want to create a travel plan using a notetaking tool"
 ```
 
 # Agent Net MVP Roadmap
@@ -92,7 +92,24 @@ Parses multi-agent (mcp array) or single-agent (agent object) manifests, builds 
     python main.py search --q "I want to use Notion"
 Returns the top-3 matches with similarity scores, overlap rationale, endpoint, and leading capabilities.
 
+## Act Through MCP Agents
+    python main.py act --q "Create a page titled 'Hello MCP' in Sandbox"
+
+When the selected agent is backed by Notion MCP, the CLI delegates to the OpenAI Agents SDK via `notion_mcp_bridge.py`. The helper prefers the Streamable HTTP endpoint (`https://mcp.notion.com/mcp`) and falls back to the SSE endpoint (`https://mcp.notion.com/sse`) if the first connection fails.
+
+### Environment Variables
+- `OPENAI_API_KEY` — required for embeddings and LLM planning.
+- `NOTION_MCP_URL` — override to point at a custom Streamable HTTP endpoint (default `https://mcp.notion.com/mcp`).
+- `NOTION_SSE_URL` — optional SSE fallback endpoint (default `https://mcp.notion.com/sse`).
+- `NOTION_MCP_AUTH` — optional `Bearer` token used when connecting to a self-hosted Notion MCP server.
+- `MCP_TIMEOUT_SECONDS` — override request timeout (default `30`).
+
+### Diagnostics
+- Inspect available Notion tools and run a smoke query:
+    python scripts/notion_check.py
+
 ## Notes
-- Chroma collection name: agents_v1
+- Python 3.10+ recommended.
+- Chroma collection name: agents_v1.
 - Capabilities and tags are stored in vector metadata for downstream use.
 - Ensure the .env file exists before running commands.
