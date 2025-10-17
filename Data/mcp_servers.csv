@@ -1,0 +1,110 @@
+id,name,child_link,description
+1,Supabase,/server/supabase,"Search the Supabase docs for up-to-date guidance and troubleshoot errors quickly. Manage organizations, projects, databases, and Edge Functions, including migrations, SQL, logs, advisors, keys, and type generation, in one flow. Create and manage development branches to iterate safely, confirm costs up front, and merge changes to production with confidence."
+2,Brave Search,/server/brave,"Visit https://brave.com/search/api/ for a free API key. Search the web, local businesses, images, videos, and news with rich, structured results. Refine results by country, language, freshness, and SafeSearch to pinpoint what you need. Generate concise summaries of findings to grasp key points faster."
+3,Memory Tool,/server/@mem0ai/mem0-memory-mcp,"Store and retrieve user-specific memories to maintain context and make informed decisions based on past interactions. Utilize a simple API to add and search memories with relevance scoring, enhancing your application's ability to remember user preferences and interactions."
+4,Exa Search,/server/exa,"Fast, intelligent web search and web crawling.
+
+New mcp tool: Exa-code is a context tool for coding agents. It provides agents with fresh information about libraries, APIs, and SDKs with the purpose of reducing hallucinations."
+5,Browserbase,/server/@browserbasehq/mcp-browserbase,"Provides cloud browser automation capabilities using Stagehand and Browserbase, enabling LLMs to interact with web pages, take screenshots, and run parallel sessions in a cloud browser environment."
+6,Fetch,/server/@smithery-ai/fetch,A simple tool that performs a fetch request to a webpage.
+7,Notion,/server/notion,"Search across your Notion workspace and connected sources to quickly find pages, databases, and users. View full page and database details for deeper context. Create and update pages, manage databases, move or duplicate content, and add comments to keep work organized."
+8,Linear,/server/linear,"Manage issues, projects, cycles, and docs in Linear from one place. Create, update, and comment on issues; organize labels, statuses, and teams; and search docs and documentation. Stay on top of your work by listing assignments, projects, and upcoming cycles."
+9,supermemory,/server/supermemory,"Supermemory's universal Memory MCP will save and bring your context everywhere you go - from Claude, Cursor, chatgpt or any AI tool."
+10,Docfork,/server/@docfork/mcp,@latest documentation and code examples to 9000+ libraries for LLMs and AI code editors in a single tool call. Just add `use docfork` to your prompt for accurate and relevant answers.
+11,Context7,/server/@upstash/context7-mcp,"Fetch up-to-date, version-specific documentation and code examples directly into your prompts. Enhance your coding experience by eliminating outdated information and hallucinated APIs. Simply add `use context7` to your questions for accurate and relevant answers."
+12,Ref,/server/@ref-tools/ref-tools-mcp,"Provide your AI coding tools with token-efficient access to up-to-date technical documentation for APIs, services, libraries, and more. Enable powerful search and reading capabilities to help your agent find precise information from documentation and web pages. 
+
+Learn more:  https://ref.tools
+
+How is this different from Context7?
+- Context7 works by looking up a library and giving you the 10k most relevant tokens. If you have 2 libraries, that's 20k tokens etc. It's unlikely you need all of that and it's costly. Ref uses on average 60% fewer tokens and up to 95% fewer (eg 500 tokens instead of 10000) in some cases.
+- Ref supports indexing private GitHub repos and PDFs so you can bring your own context as well.
+
+Want to chat or have a feature request?
+- Reach out to hello@ref.tools and say hi!"
+13,Toolbox,/server/@smithery/toolbox,Toolbox dynamically finds MCPs in the Smithery registry based on your agent's need.
+14,Blockscout MCP Server,/server/@blockscout/mcp-server,"Provide AI agents and automation tools with contextual access to blockchain data including balances, tokens, NFTs, and contract metadata. Enable multi-chain support and deliver enhanced user experience with progress notifications for long-running queries. Facilitate seamless integration with AI hosts like Claude Desktop for blockchain data analysis."
+15,Desktop Commander,/server/@wonderwhy-er/desktop-commander,"Execute terminal commands and manage files with diff editing capabilities. Coding, shell and terminal, task automation"
+16,Hugeicons MCP Server,/server/@hugeicons/mcp-server,"Integrate Hugeicons seamlessly into your applications. Discover icons, access platform-specific usage instructions, and enhance your projects with comprehensive documentation and examples."
+17,Clay MCP,/server/@clay-inc/clay-mcp,Access your network seamlessly with a simple and efficient server. Leverage a variety of tools to enhance your applications and workflows. Start integrating with your existing systems effortlessly.
+18,JigsawStack vOCR,/server/@JigsawStack/vocr,"OCR + AI = Magic: 
+Extract data from any image in a consistent structure with fine-tuned vLLMs for the highest accuracy. Learn more about AI backed OCR here: https://jigsawstack.com/docs/api-reference/ai/vocr Get your jigsawstack API key here: https://jigsawstack.com/dashboard/"
+19,E2B,/server/e2b,Add code execution and interpreting capabilities to your agents.
+20,Email sending,/server/@resend/mcp-send-email,Compose and send emails directly from your LLM applications. Integrate with Resend's API to streamline your email communication without manual copying and pasting.
+21,Semgrep MCP Server,/server/@semgrep/mcp,Scan your code for security vulnerabilities and create custom rules effortlessly. Leverage the power of Semgrep through a comprehensive interface that enhances your coding tools and AI agents. Simplify your code analysis and improve security with advanced scanning capabilities.
+22,Redis,/server/@redis/mcp-redis,"Enable AI agents to manage and search data in Redis using natural language queries. Seamlessly integrate with MCP clients to interact with Redis data structures like hashes, lists, sets, streams, and more. Enhance your applications with scalable, high-performance Redis data operations and real-time insights."
+23,Bright Data,/server/@luminati-io/brightdata-mcp,"One MCP for the Web. Easily search, crawl, navigate, and extract websites without getting blocked. Ideal for discovering and retrieving structured insights from any public source - effortlessly and ethically."
+24,Sourcebot Code Search Server,/server/@sourcebot-dev/sourcebot,"Enable precise regex-based code search across multiple code hosts like GitHub, GitLab, and BitBucket to empower LLM agents with rich code context from remote repositories. Enhance your agents' reasoning and response quality by fetching relevant code snippets and repository information without local checkouts. Seamlessly integrate with popular MCP clients to unlock advanced code intelligence capabilities."
+25,JigsawStack AI Web Scraper,/server/@JigsawStack/ai-web-scraper,"Scrape any website instantly and get consistent structured data in seconds without writing any css selector code, check out API documentation here: https://jigsawstack.com/docs/api-reference/ai/scrape Get your API key here: https://jigsawstack.com/dashboard/"
+26,Aurora Documentation,/server/@aurora-is-near/doc-aurora-dev,"A complete and continuously updated knowledge base for the Aurora ecosystem, this MCP enables developers to build on Aurora and Virtual Chains by providing technical guidance, structured documentation, configuration support, integration assistance, and troubleshooting resources. Optimized for AI agents, tools, and builders, it offers seamless access to the core capabilities of Aurora’s infrastructure through a clear and searchable interface.
+
+Aurora is a next-generation blockchain infrastructure designed to support high-performance, customizable virtual chains. These virtual chains are fully interoperable blockchains that run as smart contracts on top of the NEAR Protocol, offering developers scalability, modularity, and fine-grained control over execution and economics. Built to abstract away complexity, virtual chains enable faster development, smoother integration, and a more agent-friendly architecture for on-chain applications."
+27,Parallel Web Search,/server/@parallel/search,Highest accuracy web search for AIs
+28,Magic MCP,/server/@21st-dev/magic-mcp,v0 for MCP. Frontend feels like Magic
+29,Qdrant Server,/server/mcp-server-qdrant,A semantic memory layer that stores and retrieves information using the Qdrant vector search engine. It enables storing memories and finding relevant information through semantic search.
+30,Plane Server,/server/@makeplane/plane-mcp-server,"Enable seamless integration with Plane APIs to manage projects, work items, automations, and team collaboration. Create, update, and track projects, issues, states, labels, modules, cycles, and work logs efficiently. Build AI-powered tools that interact directly with Plane's ecosystem to enhance productivity and project management workflows."
+31,JigsawStack NSFW Detection,/server/@JigsawStack/jigsawstack-nsfw,Detect NSFW images using JigsawStack's AI Models.
+32,Decodo MCP Server,/server/@Decodo/decodo-mcp-server,"Enable your AI agents to scrape and parse web content dynamically, including geo-restricted sites, by leveraging Decodo's scraping capabilities.
+
+To use, head on over to https://dashboard.decodo.com, start a free Web Advanced trial and input the generated credentials into your MCP client of choice on the right-hand side of this page."
+33,Dart,/server/@its-dart/dart-mcp-server,"Dart is a fully-featured project management tool that uses AI to assist with roadmap planning, report generation, breaking tasks into subtasks, duplicate detection, and executing on writing and design tasks. Teams use Dart in order to chat with their tasks, plan better, and eliminate regular PM chores from their schedule, freeing up seven hours per week to focus on other work."
+34,Databutton,/server/@databutton/databutton-mcp,Build and deploy beautiful business apps effortlessly with our AI agent. Generate initial app plans and create a solid foundation for your projects using React and Python APIs. Streamline your development process and unleash unbounded complexity with ease.
+35,pure.md MCP server,/server/@puremd/puremd-mcp,"Access web content in markdown format reliably and efficiently. Unblock web pages and search the web seamlessly, enhancing your agents' capabilities. Integrate with your scripts and applications to leverage markdown delivery like a CDN."
+36,Fibery MCP Server,/server/@Fibery-inc/fibery-mcp-server,"Integrate your Fibery workspace with any LLM provider using natural language. Query, create, and update Fibery entities seamlessly through conversational interfaces. Enhance your productivity by interacting with your data effortlessly."
+37,Together Code Interpreter MCP Server,/server/@togethercomputer/mcp-server-tci,Add the ability to execute/interpret code to your AI apps.
+38,Seekeasy MCP Server,/server/@seekeasy/seekeasy,Explore Seekeasy's data with our MCP which returns recommendations for restaurants based on social media creator content. Understand the shape and trends of social media through the eyes of your favorite creators.
+39,JigsawStack AI Web Search,/server/@JigsawStack/ai-web-search,Effortlessly search the Web and get access to high-quality results powered with AI. Learn more about this API here: https://jigsawstack.com/docs/api-reference/web/ai-search Get your jigsawstack API key here: https://jigsawstack.com/dashboard/
+40,JigsawStack Translation,/server/@JigsawStack/translation,"With our real time AI Translation, you can translate any text, & images conversation, or document to any language while maintaining the context, tone, and meaning with AI enabling high accuracy and reliability.
+
+We support 180+ language pairs! Check out the list of languages we support here: https://jigsawstack.com/docs/additional-resources/languages
+
+You can get your jigsawstack key here: https://jigsawstack.com/dashboard/"
+41,Graphlit,/server/@graphlit/graphlit-mcp-server,"Integrate MCP clients with the Graphlit service.
+
+Ingest anything from Slack to Gmail to podcast feeds, in addition to web crawling, into a Graphlit project - and then retrieve relevant contents from the MCP client."
+42,Liveblocks,/server/@liveblocks/liveblocks-mcp-server,"Enable AI agents to interact with Liveblocks by creating, modifying, and deleting rooms, threads, comments, notifications, and more. Provide AI with read access to Liveblocks Storage and Yjs for enhanced collaborative capabilities. Simplify integration of Liveblocks features into AI workflows for real-time collaboration and data management."
+43,Kagi,/server/kagimcp,Access Kagi Search API for retrieving information from the web.
+44,Token Metrics MCP,/server/@token-metrics/mcp,"Provide AI assistants with real-time cryptocurrency market data, trading signals, price predictions, and advanced analytics. Enable seamless access to comprehensive crypto insights and quantitative metrics to enhance decision-making. Empower users with AI-generated reports and market sentiment analysis for smarter crypto investments."
+45,Microsoft Learn MCP,/server/@microsoft/learn_mcp,"The Microsoft Learn MCP Server is a remote MCP Server that enables clients like GitHub Copilot and other AI agents to bring trusted and up-to-date information directly from Microsoft's official documentation. It supports streamable http transport, which is lightweight for clients to use."
+46,Upstash,/server/@upstash/mcp-server,MCP server for managing Upstash Developer API operations via natural language commands.
+47,Oxylabs MCP,/server/@oxylabs/oxylabs-mcp,Fetch and process content from specified URLs using the Oxylabs Web Scraper API.
+48,EduBase MCP server,/server/@EduBase/MCP,"Interact with EduBase through our MCP server. Create dynamic quizzes, manage secure exams, and automate comprehensive assessment workflows. This seamless integration empowers educators to create personalized learning experiences, conduct secure online examinations, and scale assessment solutions with enterprise-grade security and compliance. Ideal for educational institutions, corporate training departments, and certification providers seeking to transform their digital learning infrastructure with AI-powered capabilities. Integrate with your existing systems through our secure API.
+
+Check out our GitHub page for more details and setup instructions!"
+49,Parallel Tasks,/server/@parallel/tasks,Execute Parallel.ai Tasks in Parallel for extremely powerful data enrichment from the web
+50,Kernel,/server/kernel,"Deploy and manage Kernel apps, automate browsers, and search documentation with Kernel. Securely run workflows, monitor deployments, and spin up sandboxed browser sessions, all instantly accessible through a hosted service built for AI-native automation."
+51,Intruder,/server/@intruder-io/intruder-mcp,Simplify access to Intruder's capabilities within LLM-based workflows and tools.
+52,Sentry,/server/@getsentry/sentry-mcp,Connect to the Sentry API seamlessly and enhance your applications with powerful monitoring tools. Utilize a remote middleware to access Sentry's capabilities directly from your LLM clients. Simplify your development workflow by integrating Sentry's features effortlessly.
+53,VideoDB Director,/server/@video-db/agent-toolkit,"Integrate video database management capabilities into your agents by connecting to the VideoDB Director MCP server. Easily configure and run the server to enable seamless access to video-related tools and resources within your preferred MCP clients. Keep your video data workflows efficient and up-to-date with simple installation and update commands.
+
+Get your API key here: https://console.videodb.io/"
+54,PayPal,/server/paypal,Create and share PayPal invoice links in seconds. View your recent transactions with key details. Streamline payments and keep your cash flow organized.
+55,Quillopy MCP Server,/server/@quillopy/quillopy-mcp,"Search package documentation effortlessly through the Quillopy API. Retrieve relevant documentation for programming languages and libraries with ease, enhancing your coding experience."
+56,JigsawStack Embedding,/server/@JigsawStack/jigsawstack-embeddings,This MCP server exposes a tool for generating vector embeddings using JigsawStack's AI models.
+57,Playwright Automation,/server/@microsoft/playwright-mcp,"Automate web interactions effortlessly with this server. Enable your LLMs to navigate, extract data, and perform actions on web pages using structured accessibility snapshots, enhancing reliability and performance without the need for visual models."
+58,Hackle API Server,/server/@hackle-io/hackle-mcp,Provide tools and resources to query A/B Test data through the Hackle API. Enable seamless integration of A/B testing insights into your applications. Facilitate efficient data retrieval and manipulation for experimentation workflows.
+59,Desearch AI,/server/@Desearch-ai/desearch,Enable real-time AI-powered search capabilities including Twitter (X) and web search directly within your LLM applications. Access relevant links and summaries instantly to enhance your AI workflows. Integrate seamlessly with Claude Desktop and Cursor IDE for enriched search experiences.
+60,FireCrawl,/server/@mendableai/mcp-server-firecrawl,MCP server for FireCrawl web scraping integration
+61,Redis Cloud API,/server/@redis/mcp-redis-cloud,"Manage your Redis Cloud resources effortlessly using natural language. Create databases, monitor subscriptions, and configure cloud deployments with simple commands. Streamline your Redis Cloud experience and enhance productivity with intuitive interactions."
+62,Tinybird Analytics,/server/@tinybirdco/mcp-tinybird,Connect to Tinybird's real-time analytics platform to search and analyze data.
+63,Audiense Insights,/server/@AudienseCo/mcp-audiense-insights,Extract marketing insights and audience analysis from Audiense reports.
+64,JigsawStack Object Detection,/server/@JigsawStack/jigsawstack-object-detection,Detect Objects using JigsawStack's AI Models.
+65,Solana DeFi MCP Server,/server/@neglect/solana-defi,"Billions of Solana DeFi TXNs, Decoded at Scale & accessible via LLM
+
+Direct, structured access to the entire Solana DeFi universe. Every launchpad, every token, every trade, every wallet interaction — all decoded and normalized with detail.
+
+Features
+
+- Full coverage of Solana launchpads
+- Billions of decoded on-chain events, available in real time
+- Secure bearer authentication for controlled access
+- High-volume, low-latency performance
+
+Available Data (& Growing)
+
+- Market and token data
+- Wallet and portfolio lookups
+- Historical transaction ranges
+- Advanced search across DeFi protocols"
+66,browser-tools-mcp,/server/@AgentDeskAI/browser-tools-mcp,Monitor browser logs directly from Cursor and other MCP compatible IDEs.
+67,ahref,/server/@calclavia/ahref,
