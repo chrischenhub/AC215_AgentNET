@@ -1,38 +1,41 @@
-# Set Up
+# Virtual Machine Set Up
 
-## Docker Onboard
-- create a file named `.env` in the folder root to add the api key into the container
-    ```
-    OPENAI_API_KEY=xxx
-    ```
-- Build image:
-    ```
-    docker compose build agentnet
-    ```
-- Run the docker environment
-    ```
-    docker compose run --rm agentnet
-    ```
-## Project ommand documentation
-- For windows set up docker:
-```
-# build iamge
-docker build -t agentnet-cli .
+# AgentNet RAG search + MCP Execution
+## Quickstart
+1. Copy the example environment file and fill in your keys:
+   ```bash
+   cp .env.example .env
+   # edit .env to add OPENAI_API_KEY, SMITHERY_API_KEY, etc.
+   ```
+2. Build the image and start the stack (Postgres + dev container):
+   ```bash
+   docker compose up -d --build
+   ```
 
-# run image
-docker run -it --rm --env-file .env -v "${PWD}\DB\chroma_store:/app/DB/chroma_store" agentnet-cli
+3. Execute the workflow RAG search + MCP
+    ```
+    docker compose exec agentnet python notion_agent.py "What do you want to do"
+    ```
 
-# Remove all the images built
-docker system prune
-```
-- main.py command
-```
-# build chroma DB
-python main.py ingest --json Data/Agents.json
+## Data Pipeline
 
-# Implement RAG search
-python main.py search --q "I want to create a travel plan using a notetaking tool"
-```
+`parentPageExtract.py`: discover and scrape MCP parent pages to build a list of MCP servers (id, discovery_url, minimal metadata) and write the result to servers.csv
+
+`childpageextract.py`: read servers.csv, visit each server entry to extract full server details (tools, parameters, descriptions, endpoints, provider, tags), normalize fields, and write the result to servers_full.csv
+
+`mcp_to_json.py`: convert servers_full.csv into a canonical agents.json (serialize rows into the expected JSON schema / `mcp` array or top-level `agent` objects), validate required fields, and write agents.json
+
+`RAG.py`: load agents.json, chunk content **by tool** (one chunk per tool including tool_name, tool_description, parameters, plus agent metadata), compute embeddings for each chunk, add texts+metadata to a Chroma collection persisted at DB/chroma_store, call persist(), and upload the DB/chroma_store directory to the configured Google Cloud Storage bucket
+
+## RAG -> MCP workflow (Ex. Notion)
+1. `main.py`: User enter a question.For example, "I want to create a  "I want to create a SQL study plan using a notetaking tool."
+
+2. `RAG.py`: mount the ChromaDB stored in google cloud bucket to the docker container and retrieve the Top 3 most relevant MCP servers that meet the user's request
+
+Results: 
+![alt text](image.png)
+
+
 
 # Agent Net MVP Roadmap
 
@@ -70,43 +73,7 @@ python main.py search --q "I want to create a travel plan using a notetaking too
   ```json
   { "query": "take notes", "top_k": 5 }
 
-# AgentNET Search CLI
 
-Minimal retrieval utility for browsing MCP agents stored in Data/Agents.json.
-
-## Prerequisites
-- Python 3.10+
-- OpenAI API key in .env (copy .env.example -> .env)
-- Virtual environment recommended
-
-## Installation
-    python -m venv .venv
-    source .venv/bin/activate  # Windows: .venv\Scripts\activate
-    pip install -r requirements.txt
-
-## Ingest Agents
-    python main.py ingest --json Data/Agents.json
-Parses multi-agent (mcp array) or single-agent (agent object) manifests, builds OpenAI embeddings (text-embedding-3-large), and persists them to Chroma at DB/chroma_store.
-
-## Search Catalog
-    python main.py search --q "I want to use Notion"
-Returns the top-3 matches with similarity scores, overlap rationale, endpoint, and leading capabilities.
-
-## Act Through MCP Agents
-    python main.py act --q "Create a page titled 'Hello MCP' in Sandbox"
-
-When the selected agent is backed by Notion MCP, the CLI delegates to the OpenAI Agents SDK via `notion_mcp_bridge.py`. The helper prefers the Streamable HTTP endpoint (`https://mcp.notion.com/mcp`) and falls back to the SSE endpoint (`https://mcp.notion.com/sse`) if the first connection fails.
-
-### Environment Variables
-- `OPENAI_API_KEY` — required for embeddings and LLM planning.
-- `NOTION_MCP_URL` — override to point at a custom Streamable HTTP endpoint (default `https://mcp.notion.com/mcp`).
-- `NOTION_SSE_URL` — optional SSE fallback endpoint (default `https://mcp.notion.com/sse`).
-- `NOTION_MCP_AUTH` — optional `Bearer` token used when connecting to a self-hosted Notion MCP server.
-- `MCP_TIMEOUT_SECONDS` — override request timeout (default `30`).
-
-### Diagnostics
-- Inspect available Notion tools and run a smoke query:
-    python scripts/notion_check.py
 
 ## Notes
 - Python 3.10+ recommended.
