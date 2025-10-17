@@ -1,7 +1,7 @@
 # Virtual Machine Set Up
 ![alt text](Image/vm.png)
 
-# 1. AgentNet RAG search + MCP Execution
+# AgentNet RAG search + MCP Execution
 ## Quickstart
 1. Copy the example environment file and fill in your keys:
    ```bash
@@ -32,11 +32,11 @@
 
 ## Data Pipeline
 
-`parentPageExtract.py`: discover and scrape MCP parent pages to build a list of MCP servers from smithery AI webpage (id, discovery_url, minimal metadata) and write the result to servers.csv
+`parentPageExtract.py`: discover and scrape smithery AI MCP parent pages using BeautifulSoup to build a list of MCP servers from smithery AI webpage (id, discovery_url, minimal metadata) and write the result to `Data/mcp_servers.csv ` and save the downloaded HTML to `Data/HTMLData` folder I(did not commit due to size limit)
 
-`childpageextract.py`: read servers.csv, visit each server entry to extract full server details (tools, parameters, descriptions, endpoints, provider, tags), normalize fields, and write the result to servers_full.csv
+`childpageextract.py`: read servers.csv to get the HTTP link of each MCP server, visit each server entry to scrape full server details (tools, parameters, descriptions, endpoints, provider, tags), normalize fields, and write the result to `Data/mcp_server_tools.csv`
 
-`mcp_to_json.py`: convert servers_full.csv into a canonical agents.json (serialize rows into the expected JSON schema / `mcp` array or top-level `agent` objects), validate required fields, and write agents.json
+`mcp_to_json.py`: convert `Data/mcp_server_tools.csv` into a canonical agents.json (serialize rows into the expected JSON schema / `mcp` array or top-level `agent` objects), validate required fields, and write `Data/mcp_server_tools.json`
 
 `RAG.py`: load agents.json, chunk content **by tool** (one chunk per tool including tool_name, tool_description, parameters, plus agent metadata), compute embeddings for each chunk, add texts+metadata to a Chroma collection persisted at DB/chroma_store, call persist(), and upload the DB/chroma_store directory to the configured Google Cloud Storage bucket
 
