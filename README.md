@@ -1,6 +1,7 @@
 # Virtual Machine Set Up
+![alt text](Image/vm.png)
 
-# AgentNet RAG search + MCP Execution
+# 1. AgentNet RAG search + MCP Execution
 ## Quickstart
 1. Copy the example environment file and fill in your keys:
    ```bash
@@ -57,4 +58,15 @@ Results:
 
 Results from Notion page:
 ![alt text](Image/image3.png)
+
+# 2. AgentNET MCP Server
+## Overview
+A Model Context Protocol (MCP) server that provides search and discovery capabilities for MCP servers. This server allows AI assistants to search for relevant tools and services by natural language queries.
+
+## Instruction
+See README.md under AgentNet/AgentNetMCP
+
+## Work example
+![alt text](Image/mcp1.png)
+![alt text](Image/mcp2.png)
 

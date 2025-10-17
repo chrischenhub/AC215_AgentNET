@@ -1,8 +1,8 @@
 # AgentNET MCP Server
 
-A Model Context Protocol (MCP) server that provides search and discovery capabilities for MCP servers, APIs, and agents. This server allows AI assistants to search for relevant tools and services by natural language queries.
+A Model Context Protocol (MCP) server that provides search and discovery capabilities for MCP servers. This server allows AI assistants to search for relevant tools and services by natural language queries.
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -41,7 +41,7 @@ A Model Context Protocol (MCP) server that provides search and discovery capabil
    node test-integration.js
    ```
 
-## 🔧 Connecting to Cursor
+## Connecting to Cursor
 
 ### Method 1: Global Configuration (Recommended)
 
@@ -72,24 +72,7 @@ Add the MCP server to your Cursor settings:
 
 3. **Restart Cursor** to load the new configuration.
 
-### Method 2: Workspace Configuration
-
-Create a `.cursor-mcp-config.json` file in your workspace root:
-
-```json
-{
-  "mcpServers": {
-    "agentnet": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/AgentNET/AgentNetMCP/mcp-server.js"
-      ]
-    }
-  }
-}
-```
-
-## 🛠️ Available Tools
+## Available Tools
 
 The AgentNET MCP server provides the following tools:
 
@@ -164,7 +147,7 @@ Find agents using semantic similarity search with vector embeddings.
 Semantic search for "document management tools"
 ```
 
-## 📊 Database Configuration
+## Database Configuration
 
 The server uses PostgreSQL with the following default configuration:
 
@@ -190,7 +173,7 @@ DB_PASSWORD=mySecurePassword123
 OPENAI_API_KEY=your_openai_api_key_here
 ```
 
-## 🧪 Testing
+## Testing
 
 ### Test Database Connection
 ```bash
@@ -205,8 +188,6 @@ node mcp-server.js
 # In another terminal, test with JSON-RPC messages
 echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}' | node mcp-server.js
 ```
-
-## 📝 Usage Examples
 
 Once connected to Cursor, you can use the AgentNET MCP server by asking questions like:
 
@@ -240,63 +221,6 @@ The database comes pre-populated with:
 - **Endpoint:** https://mcp.notion.com/mcp
 - **Authentication:** OAuth2 required
 
-## 🚨 Troubleshooting
-
-### Common Issues
-
-1. **Database Connection Failed**
-   ```bash
-   # Check if PostgreSQL is running
-   docker ps
-   
-   # Check database logs
-   docker-compose logs postgres
-   
-   # Restart the database
-   docker-compose restart postgres
-   ```
-
-2. **MCP Server Not Found**
-   - Verify the absolute path in your Cursor configuration
-   - Ensure the `mcp-server.js` file exists and is executable
-   - Restart Cursor after configuration changes
-
-3. **Empty Search Results**
-   ```bash
-   # Repopulate the database
-   node populate-db.js
-   ```
-
-4. **Port Conflicts**
-   - The database runs on port 5433 to avoid conflicts
-   - If you have issues, check what's running on port 5433:
-     ```bash
-     lsof -i :5433
-     ```
-
-### Debug Mode
-
-Enable debug logging by setting environment variables:
-
-```bash
-export DEBUG=mcp:*
-node mcp-server.js
-```
-
-## 🔄 Adding More Data
-
-### Add New Agents
-
-1. **Edit the data file:**
-   ```bash
-   # Modify Data/Agents.json with new agent data
-   ```
-
-2. **Repopulate the database:**
-   ```bash
-   node populate-db.js
-   ```
-
 ### Direct Database Access
 
 Connect directly to the database:
@@ -309,7 +233,7 @@ docker exec -it agentnet-postgres-1 psql -U postgres -d agentnet
 psql -h localhost -p 5433 -U postgres -d agentnet
 ```
 
-## 📚 API Reference
+## API Reference
 
 ### Agent Schema
 
@@ -344,29 +268,3 @@ psql -h localhost -p 5433 -U postgres -d agentnet
   "output_schema": "object (JSON schema)"
 }
 ```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Add your agent data to `Data/Agents.json`
-4. Test your changes
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🆘 Support
-
-If you encounter issues:
-
-1. Check the troubleshooting section above
-2. Review the logs: `docker-compose logs postgres`
-3. Test the database connection: `node test-integration.js`
-4. Verify your Cursor configuration
-5. Open an issue on GitHub
-
----
-
-**🎉 Happy searching! The AgentNET MCP server is ready to help you discover and connect with powerful MCP tools and agents.**
