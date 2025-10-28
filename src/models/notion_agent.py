@@ -22,10 +22,11 @@ Environment variables:
 
 import argparse
 import asyncio
+import dataclasses
 import os
 import sys
-from typing import Optional
-from urllib.parse import urlencode
+from typing import Any, Optional
+from urllib.parse import urlencode, urlparse, urlunparse
 
 from agents import Agent, Runner
 from agents.mcp import MCPServerStreamableHttp
@@ -93,30 +94,109 @@ def build_agent(notion_url: str, parent_id: str | None) -> Agent:
     )
 
 
+def sanitize_notion_url_for_logs(url: str) -> str:
+    """
+    Ensure we never leak sensitive Smithery API keys when echoing the MCP URL.
+    """
+    parsed = urlparse(url)
+    if not parsed.query:
+        return url
+    masked_query = "api_key=***"
+    return urlunparse(parsed._replace(query=masked_query))
+
+
+def resolve_instruction(
+    user_request: str,
+    *,
+    clarified_request: Optional[str],
+    interactive: Optional[bool],
+    notion_url: str,
+) -> str:
+    should_prompt = interactive
+    if should_prompt is None:
+        should_prompt = clarified_request is None and sys.stdin.isatty()
+
+    if should_prompt:
+        masked_url = sanitize_notion_url_for_logs(notion_url)
+        print(f"\nConnected MCP server: {masked_url}")
+        prompt = (
+            "Describe exactly what you want the Notion agent to do.\n"
+            "Press Enter to reuse the previous instruction: "
+        )
+        clarified = input(prompt).strip()
+        return clarified or user_request
+
+    if clarified_request:
+        return clarified_request.strip() or user_request
+    return user_request
+
+
+def coerce_final_output(result: Any) -> str:
+    value = getattr(result, "final_output", result)
+    return str(value)
+
+
+def serialize_agent_result(obj: Any) -> Any:
+    if isinstance(obj, (str, int, float, bool)) or obj is None:
+        return obj
+    if isinstance(obj, list):
+        return [serialize_agent_result(item) for item in obj]
+    if isinstance(obj, dict):
+        return {str(key): serialize_agent_result(val) for key, val in obj.items()}
+    if dataclasses.is_dataclass(obj):
+        return {
+            field.name: serialize_agent_result(getattr(obj, field.name))
+            for field in dataclasses.fields(obj)
+        }
+    model_dump = getattr(obj, "model_dump", None)
+    if callable(model_dump):
+        try:
+            dumped = model_dump()
+        except TypeError:
+            dumped = model_dump(mode="json")
+        return serialize_agent_result(dumped)
+    if hasattr(obj, "__dict__"):
+        return {
+            key: serialize_agent_result(val)
+            for key, val in obj.__dict__.items()
+            if not key.startswith("_")
+        }
+    return str(obj)
+
+
 async def run_notion_task(
     user_request: str,
     *,
     notion_mcp_base_url: Optional[str] = None,
     parent_id: Optional[str] = None,
-) -> str:
+    clarified_request: Optional[str] = None,
+    interactive: Optional[bool] = None,
+    return_full: bool = False,
+) -> Any:
     if not os.environ.get("OPENAI_API_KEY"):
         raise RuntimeError("OPENAI_API_KEY is required.")
 
     notion_url = build_smithery_notion_url(notion_mcp_base_url)
 
-    print(f"\nConnected MCP server: {notion_url}")
-    prompt = (
-        "Describe exactly what you want the Notion agent to do.\n"
-        "Press Enter to reuse the previous instruction: "
+    task_instruction = resolve_instruction(
+        user_request,
+        clarified_request=clarified_request,
+        interactive=interactive,
+        notion_url=notion_url,
     )
-    clarified_request = input(prompt).strip()
-    task_instruction = clarified_request or user_request
 
     agent = build_agent(notion_url, parent_id)
 
     async with agent.mcp_servers[0]:
         result = await Runner.run(agent, task_instruction)
-    return str(getattr(result, "final_output", result))
+
+    final_output = coerce_final_output(result)
+    if not return_full:
+        return final_output
+    return {
+        "final_output": final_output,
+        "raw_output": serialize_agent_result(result),
+    }
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:

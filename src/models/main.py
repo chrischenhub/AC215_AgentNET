@@ -4,28 +4,9 @@ import argparse
 import asyncio
 from typing import Any
 
-from RAG import PERSIST_DIR as DEFAULT_PERSIST_DIR, search_servers
+from RAG import PERSIST_DIR as DEFAULT_PERSIST_DIR
 from notion_agent import run_notion_task
-
-DEFAULT_TOP_SERVERS = 3
-DEFAULT_K_TOOLS = 12
-
-
-def derive_mcp_url(child_link: str) -> str:
-    """
-    Build the Smithery MCP endpoint from a catalog child link.
-    Example: /server/notion -> https://server.smithery.ai/notion/mcp
-    """
-    if not child_link:
-        raise ValueError("Child link is required to derive the MCP URL.")
-
-    trimmed = child_link.strip()
-    if trimmed.startswith("/server"):
-        trimmed = trimmed[len("/server") :]
-    trimmed = trimmed.strip("/")
-    if not trimmed:
-        raise ValueError(f"Unable to derive MCP path from child link: {child_link}")
-    return f"https://server.smithery.ai/{trimmed}/mcp"
+from workflow import DEFAULT_K_TOOLS, DEFAULT_TOP_SERVERS, derive_mcp_url, rag_search
 
 
 def prompt_for_selection(results: list[dict[str, Any]]) -> dict[str, Any]:
@@ -56,13 +37,13 @@ def prompt_for_selection(results: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 async def run_workflow(args: argparse.Namespace) -> None:
-    results = search_servers(
+    results = rag_search(
         args.query,
-        args.persist_dir,
         catalog_path=args.catalog,
         top_servers=args.top_servers,
         k_tools=args.k_tools,
         force_reindex=args.reindex,
+        persist_dir=args.persist_dir,
     )
     if not results:
         print("No matching servers found.")

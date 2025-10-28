@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgentNet</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+</head>
+<body>
+<div id="background"></div>
+<div id="app">
+    <header class="hero">
+        <div class="sparkles" aria-hidden="true">* * *</div>
+        <h1>Ask AgentNet!</h1>
+        <p class="tagline">Chat with the Notion automation agent right in your browser.</p>
+    </header>
+
+    <main class="content">
+        <section id="conversation" aria-live="polite" aria-label="Conversation history">
+            <!-- Messages will be injected here -->
+        </section>
+
+        <section id="results-panel" class="panel hidden" aria-label="RAG search results">
+            <header class="panel-header">
+                <h2>Top Matches</h2>
+                <p>Select a server to rerun the agent.</p>
+            </header>
+            <div id="results-list" class="results-list"></div>
+        </section>
+
+        <section id="agent-panel" class="panel hidden" aria-label="Agent output">
+            <header class="panel-header">
+                <h2>Agent Output</h2>
+            </header>
+            <div id="agent-output" class="agent-message"></div>
+            <details class="raw-toggle">
+                <summary>Full Agent Payload</summary>
+                <pre id="agent-raw" class="raw-output" translate="no">No agent run yet.</pre>
+            </details>
+        </section>
+    </main>
+
+    <form id="query-form" class="input-row" autocomplete="off">
+        <input
+            id="query-input"
+            name="query"
+            type="text"
+            placeholder="How can I help you today?"
+            aria-label="Ask AgentNet"
+            required
+        >
+        <button id="submit-button" type="submit" class="send-button" aria-label="Send prompt">
+            &#10148;
+        </button>
+    </form>
+
+    <div id="status-bar" role="status" aria-live="polite"></div>
+</div>
+
+<script src="{{ url_for('static', path='app.js') }}" defer></script>
+</body>
+</html>
