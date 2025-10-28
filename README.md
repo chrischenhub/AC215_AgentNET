@@ -5,6 +5,9 @@
 ## Quickstart
 
 0. Go to src/models
+   ```bash
+   cd src/models
+   ```
 
 1. Copy the example environment file and fill in your keys:
    ```bash
