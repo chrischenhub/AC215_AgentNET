@@ -3,6 +3,9 @@
 
 # AgentNet RAG search + MCP Execution
 ## Quickstart
+
+0. Go to src/models
+
 1. Copy the example environment file and fill in your keys:
    ```bash
    cp .env.example .env
@@ -27,7 +30,7 @@
 
 3. Execute the workflow RAG search + MCP
     ```
-    docker compose exec agentnet python notion_agent.py "What do you want to do"
+    docker compose exec agentnet python main.py "What do you want to do"
     ```
 
 ## Data Pipeline
