@@ -32,7 +32,11 @@ RUN pip install --upgrade pip wheel \
 
 # ---------- Entrypoint ----------
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# switch to
+# RUN chmod +x /usr/local/bin/docker-entrypoint.sh if not working
+RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
+ && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["/bin/bash"]
