@@ -32,6 +32,8 @@ services:
     <<: *agentnet-base
     build:
       context: .
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -47,6 +49,8 @@ services:
     <<: *agentnet-base
     build:
       context: .
+    env_file:
+      - .env
     profiles: ["notion"]
     command: ["python", "notion_agent.py", "--help"]
 
