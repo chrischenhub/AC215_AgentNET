@@ -42,6 +42,11 @@
 
 4. Launch locally with docker compose up agentnet (or uvicorn app:create_app --reload inside the container) and visit http://localhost:8000 to use the browser client.
 
+Interface:
+![alt text](Image/frontend.png)
+
+![alt text](Image/frontend2.png)
+
 ## Data Pipeline
 
 `parentPageExtract.py`: discover and scrape smithery AI MCP parent pages using BeautifulSoup to build a list of MCP servers from smithery AI webpage (id, discovery_url, minimal metadata) and write the result to `Data/mcp_servers.csv ` and save the downloaded HTML to `Data/HTMLData` folder I(did not commit due to size limit)
