@@ -1,6 +1,3 @@
-# Virtual Machine Set Up
-![alt text](Image/vm.png)
-
 # AgentNet RAG search + MCP Execution
 ## Quickstart
 
@@ -35,6 +32,15 @@
     ```
     docker compose exec agentnet python main.py "What do you want to do"
     ```
+## Front End (under models/static)
+
+1. Built as a lightweight FastAPI site (`app.py`) that serves templates/index.html plus the static bundle in `static/app.js` and `static/styles.css`.
+
+2. `app.js` drives the UX: it posts to `/api/search` to fetch RAG-ranked MCP servers, renders them as selectable cards, and calls `/api/execute` to run the Notion agent against the chosen server.
+
+3. `styles.css` supplies the glassmorphism look-and-feel, responsive layout, and accessibility-centric focus states.
+
+4. Launch locally with docker compose up agentnet (or uvicorn app:create_app --reload inside the container) and visit http://localhost:8000 to use the browser client.
 
 ## Data Pipeline
 
