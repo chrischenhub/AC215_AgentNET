@@ -5,8 +5,13 @@ import asyncio
 from typing import Any
 
 from RAG import PERSIST_DIR as DEFAULT_PERSIST_DIR
-from notion_agent import run_notion_task
-from workflow import DEFAULT_K_TOOLS, DEFAULT_TOP_SERVERS, derive_mcp_url, rag_search
+from workflow import (
+    DEFAULT_K_TOOLS,
+    DEFAULT_TOP_SERVERS,
+    derive_mcp_url,
+    execute_mcp_workflow,
+    rag_search,
+)
 
 
 def prompt_for_selection(results: list[dict[str, Any]]) -> dict[str, Any]:
@@ -58,29 +63,36 @@ async def run_workflow(args: argparse.Namespace) -> None:
     child_link = chosen.get("child_link", "")
     notion_instruction = args.notion_instruction or args.query
 
-    mcp_url = derive_mcp_url(child_link)
+    try:
+        mcp_url = derive_mcp_url(child_link)
+    except ValueError as exc:
+        print(f"Unable to derive MCP URL: {exc}")
+        return
     print(f"\nUsing server '{server_name}' with MCP endpoint: {mcp_url}")
 
-    final_output = await run_notion_task(
-        notion_instruction,
-        notion_mcp_base_url=mcp_url,
+    envelope = await execute_mcp_workflow(
+        notion_instruction=notion_instruction,
+        child_link=child_link,
+        server_name=server_name,
+        include_raw_payload=False,
     )
+    final_output = envelope.final_output
 
-    print("\n=== Notion Agent Output ===\n")
+    print("\n=== Agent Output ===\n")
     print(final_output)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run a RAG search, select an MCP server, and execute a Notion task."
+        description="Run a RAG search, select a Smithery MCP server, and execute the task."
     )
     parser.add_argument(
         "query",
-        help="Natural language query used for the RAG search (and default Notion instruction).",
+        help="Natural language query used for the RAG search (and default agent instruction).",
     )
     parser.add_argument(
         "--notion-instruction",
-        help="Explicit instruction to send to the Notion agent (defaults to the query).",
+        help="Explicit instruction to send to the selected MCP agent (defaults to the query).",
     )
     parser.add_argument(
         "--persist-dir",

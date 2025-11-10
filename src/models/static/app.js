@@ -233,6 +233,7 @@ const runAgentWithIndex = async (index) => {
   const payload = await fetchJSON("/api/execute", {
     notion_instruction: currentInstruction,
     child_link: server.child_link,
+    server_name: server.server,
   });
 
   appendMessage(

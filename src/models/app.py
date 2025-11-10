@@ -62,6 +62,10 @@ class SearchPayload(BaseModel):
 class ExecutePayload(BaseModel):
     notion_instruction: str = Field(..., description="Instruction to send to the Notion agent.")
     child_link: str = Field(..., description="MCP child link for the selected server.")
+    server_name: str | None = Field(
+        None,
+        description="Display name of the selected server (used for contextual prompts).",
+    )
     clarified_instruction: str | None = Field(
         None,
         description="Optional refined instruction to override the original query.",
@@ -111,6 +115,7 @@ async def api_execute(payload: ExecutePayload) -> dict[str, Any]:
         envelope = await execute_mcp_workflow(
             notion_instruction=payload.notion_instruction,
             child_link=payload.child_link,
+            server_name=payload.server_name,
             clarified_instruction=payload.clarified_instruction,
             notion_mcp_base_url_override=payload.notion_mcp_base_url_override,
             include_raw_payload=True,

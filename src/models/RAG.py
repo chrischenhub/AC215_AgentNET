@@ -17,7 +17,7 @@ from langchain_openai import OpenAIEmbeddings
 COLLECTION_NAME = "agents_v1"
 PERSIST_DIR = "GCB"
 EMBED_MODEL = "text-embedding-3-large"
-CATALOG_PATH = "Data/mcp_server_tools.json"
+CATALOG_PATH = "Data/mcp_server_tools_core.json"
 DEFAULT_GCS_BUCKET = "agentnet215"
 DEFAULT_GCS_PREFIX = "chroma_store"
 GCS_PROJECT_ID = "charlesproject-471117"
@@ -437,4 +437,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
