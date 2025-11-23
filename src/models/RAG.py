@@ -42,8 +42,9 @@ class ToolChunk:
 def sanitize_description(desc: str) -> str:
     if not desc:
         return ""
-    desc = _TAG_BLOCK_RE.sub(" ", desc)
-    desc = _TAG_SINGLE_RE.sub(" ", desc)
+    # Strip all HTML-like tags and collapse whitespace. This is intentionally
+    # simple to avoid partial removals when tags are nested.
+    desc = re.sub(r"<[^>]+>", " ", desc)
     return re.sub(r"\s+", " ", desc).strip()
 
 
