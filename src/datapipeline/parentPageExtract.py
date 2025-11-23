@@ -24,7 +24,7 @@ from requests.exceptions import HTTPError, RequestException
 BASE_URL = "https://smithery.ai"
 SEARCH_PATH = "/search"
 SEARCH_QUERY = "is:verified"
-TOTAL_PAGES = 5  # base page + four additional pages
+TOTAL_PAGES = 1  # base page + four additional pages
 REQUEST_PAUSE_SECONDS = 1.0
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "

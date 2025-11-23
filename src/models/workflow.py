@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from RAG import PERSIST_DIR as DEFAULT_PERSIST_DIR, search_servers
-from notion_agent import run_notion_task
+from notion_agent import run_smithery_task
 
 DEFAULT_TOP_SERVERS = 3
 DEFAULT_K_TOOLS = 12
@@ -39,6 +39,21 @@ def derive_mcp_url(child_link: str) -> str:
     if not trimmed:
         raise ValueError(f"Unable to derive MCP path from child link: {child_link}")
     return f"https://server.smithery.ai/{trimmed}/mcp"
+
+
+def extract_server_slug(child_link: str) -> str:
+    """
+    Convert a Smithery child link (e.g. /server/notion) into its slug.
+    """
+    if not child_link:
+        raise ValueError("Child link is required to derive the server slug.")
+    trimmed = child_link.strip().strip("/")
+    if trimmed.startswith("server/"):
+        trimmed = trimmed[len("server/") :]
+    slug = trimmed.split("/")[0].strip()
+    if not slug:
+        raise ValueError(f"Unable to derive server slug from child link: {child_link}")
+    return slug
 
 
 def rag_search(
@@ -91,6 +106,7 @@ async def execute_mcp_workflow(
     *,
     notion_instruction: str,
     child_link: str,
+    server_name: Optional[str] = None,
     clarified_instruction: Optional[str] = None,
     notion_mcp_base_url_override: Optional[str] = None,
     include_raw_payload: bool = True,
@@ -102,10 +118,13 @@ async def execute_mcp_workflow(
     """
 
     base_url = notion_mcp_base_url_override or derive_mcp_url(child_link)
+    server_slug = extract_server_slug(child_link)
 
-    agent_result = await run_notion_task(
+    agent_result = await run_smithery_task(
         notion_instruction,
-        notion_mcp_base_url=base_url,
+        server_slug=server_slug,
+        server_name=server_name,
+        smithery_mcp_base_url=base_url,
         clarified_request=clarified_instruction,
         interactive=False,
         return_full=include_raw_payload,
