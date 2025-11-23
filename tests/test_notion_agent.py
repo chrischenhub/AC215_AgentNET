@@ -41,7 +41,7 @@ def test_resolve_instruction_prefers_clarified_request() -> None:
         "original",
         clarified_request=" updated ",
         interactive=False,
-        notion_url="https://example.com",
+        mcp_url="https://example.com",
         server_label="Demo",
     )
     assert result == "updated"
