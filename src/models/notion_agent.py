@@ -337,12 +337,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 async def main_async(argv: list[str] | None = None) -> None:  # pragma: no cover - CLI wrapper
     args = parse_args(argv or sys.argv[1:])
-    parent_id = os.environ.get("NOTION_PARENT_ID") if args.slug == "notion" else None
     final_output = await run_smithery_task(
         args.user_request,
         server_slug=args.slug,
         smithery_mcp_base_url=args.smithery_mcp_base_url,
-        parent_id=parent_id,
     )
     print("\n=== Agent Response ===\n")
     print(final_output)
