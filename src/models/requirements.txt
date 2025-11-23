@@ -2,9 +2,6 @@
 openai>=1.40.0
 openai-agents>=0.1.0
 
-# MCP client (protocol support)
-mcp
-
 # Your stack
 langchain
 langchain-community

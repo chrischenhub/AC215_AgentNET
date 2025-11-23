@@ -124,7 +124,7 @@ def build_agent(
     notion_url: str,
     server_name: str,
     parent_id: str | None,
-) -> Agent:
+) -> Agent:  # pragma: no cover - constructs external Agent objects
     """
     Create an Agent that knows how to use the selected MCP tools when the task requires it.
     We keep tool choice 'auto' so the model decides when to call a tool.
@@ -335,7 +335,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-async def main_async(argv: list[str] | None = None) -> None:
+async def main_async(argv: list[str] | None = None) -> None:  # pragma: no cover - CLI wrapper
     args = parse_args(argv or sys.argv[1:])
     parent_id = os.environ.get("NOTION_PARENT_ID") if args.slug == "notion" else None
     final_output = await run_smithery_task(
@@ -348,7 +348,7 @@ async def main_async(argv: list[str] | None = None) -> None:
     print(final_output)
 
 
-def main() -> None:
+def main() -> None:  # pragma: no cover - CLI wrapper
     asyncio.run(main_async())
 
 

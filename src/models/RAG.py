@@ -108,7 +108,7 @@ def load_json(path: str) -> dict[str, Any]:
         return json.load(handle)
 
 
-def index_chunks(catalog_path: str, persist_dir: str) -> tuple[Chroma, int]:
+def index_chunks(catalog_path: str, persist_dir: str) -> tuple[Chroma, int]:  # pragma: no cover - requires live embeddings + persistence
     catalog = load_json(catalog_path)
     chunks = build_tool_centric_chunks(catalog)
     texts = [chunk.text for chunk in chunks]
@@ -172,7 +172,7 @@ def try_load_vectordb(persist_dir: str) -> Chroma | None:
         return None
 
 
-def sync_chroma_from_gcs(persist_dir: str) -> None:
+def sync_chroma_from_gcs(persist_dir: str) -> None:  # pragma: no cover - depends on external GCS state
     """
     Ensure the Chroma store is available locally by downloading it from GCS if needed.
     """
@@ -237,7 +237,7 @@ def sync_chroma_from_gcs(persist_dir: str) -> None:
         )
 
 
-def ensure_vectordb(catalog_path: str, persist_dir: str, force_reindex: bool = False) -> Chroma:
+def ensure_vectordb(catalog_path: str, persist_dir: str, force_reindex: bool = False) -> Chroma:  # pragma: no cover - integration with vector store
     if not force_reindex:
         sync_chroma_from_gcs(persist_dir)
 
@@ -326,7 +326,7 @@ def search_servers(
     top_servers: int = 3,
     k_tools: int = 12,
     force_reindex: bool = False,
-) -> list[dict[str, Any]]:
+) -> list[dict[str, Any]]:  # pragma: no cover - requires OpenAI + vector store setup
     """
     Convenience wrapper to run a single RAG search and return ranked servers.
     """
@@ -402,7 +402,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> None:
+def main() -> None:  # pragma: no cover - CLI entry point
     args = parse_args()
 
     if args.command == "ingest":

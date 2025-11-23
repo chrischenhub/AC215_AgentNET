@@ -76,6 +76,12 @@ Results:
 Results from Notion page:
 ![alt text](Image/image3.png)
 
+# CI / Testing
+- Requires Python 3.11 locally to match GitHub Actions. Install tooling: `python -m pip install -r src/models/requirements-dev.txt`.
+- Lint: `flake8 src/models tests`
+- Tests with coverage (fails under 50% by config): `pytest`
+- GitHub Actions runs the same steps on every push/PR via `.github/workflows/ci.yml` (checkout → install deps → byte-compile → lint → pytest with coverage).
+
 # 2. AgentNET MCP Server
 ## Overview
 A Model Context Protocol (MCP) server that provides search and discovery capabilities for MCP servers. This server allows AI assistants to search for relevant tools and services by natural language queries.
@@ -86,4 +92,3 @@ See README.md under AgentNet/AgentNetMCP
 ## Work example
 ![alt text](Image/mcp1.png)
 ![alt text](Image/mcp2.png)
-
