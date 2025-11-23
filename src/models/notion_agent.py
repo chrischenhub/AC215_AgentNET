@@ -121,7 +121,7 @@ def build_smithery_url(
 def build_agent(
     profile: SmitheryMCPProfile,
     *,
-    notion_url: str,
+    mcp_url: str,
     server_name: str,
     parent_id: str | None,
 ) -> Agent:  # pragma: no cover - constructs external Agent objects
@@ -139,7 +139,7 @@ def build_agent(
     # https://openai.github.io/openai-agents-python/mcp/
     server = MCPServerStreamableHttp(
         name=f"{server_name} (Smithery Streamable HTTP)",
-        params={"url": notion_url},
+        params={"url": mcp_url},
         cache_tools_list=True,
         max_retry_attempts=3,
     )
@@ -172,7 +172,7 @@ def resolve_instruction(
     *,
     clarified_request: Optional[str],
     interactive: Optional[bool],
-    notion_url: str,
+    mcp_url: str,
     server_label: str,
 ) -> str:
     should_prompt = interactive
@@ -180,7 +180,7 @@ def resolve_instruction(
         should_prompt = clarified_request is None and sys.stdin.isatty()
 
     if should_prompt:
-        masked_url = sanitize_url_for_logs(notion_url)
+        masked_url = sanitize_url_for_logs(mcp_url)
         print(f"\nConnected MCP server ({server_label}): {masked_url}")
         prompt = (
             "Describe exactly what you want the Notion agent to do.\n"
@@ -254,7 +254,7 @@ async def run_smithery_task(
 
     profile = get_profile(server_slug)
     resolved_name = server_name or profile.display_name
-    notion_url = build_smithery_url(
+    mcp_url = build_smithery_url(
         profile=profile,
         base_url=smithery_mcp_base_url,
     )
@@ -265,13 +265,13 @@ async def run_smithery_task(
         user_request,
         clarified_request=clarified_request,
         interactive=interactive,
-        notion_url=notion_url,
+        mcp_url=mcp_url,
         server_label=resolved_name,
     )
 
     agent = build_agent(
         profile,
-        notion_url=notion_url,
+        mcp_url=mcp_url,
         server_name=resolved_name,
         parent_id=resolved_parent_id,
     )
@@ -324,12 +324,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--slug",
-        default="notion",
+        default="NA",
         help="Smithery server slug to use (default: notion).",
     )
     parser.add_argument(
         "--url",
-        dest="notion_mcp_base_url",
+        dest="smithery_mcp_base_url",
         help="Override the Smithery MCP base URL.",
     )
     return parser.parse_args(argv)
@@ -341,7 +341,7 @@ async def main_async(argv: list[str] | None = None) -> None:  # pragma: no cover
     final_output = await run_smithery_task(
         args.user_request,
         server_slug=args.slug,
-        smithery_mcp_base_url=args.notion_mcp_base_url,
+        smithery_mcp_base_url=args.smithery_mcp_base_url,
         parent_id=parent_id,
     )
     print("\n=== Agent Response ===\n")
