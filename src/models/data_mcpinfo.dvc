@@ -1,0 +1,6 @@
+outs:
+- md5: f4fad7a30bcc570eed94812b872934fe.dir
+  size: 6536872
+  nfiles: 5
+  hash: md5
+  path: data_mcpinfo

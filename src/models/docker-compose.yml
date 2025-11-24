@@ -4,8 +4,13 @@ x-agentnet-base: &agentnet-base
   platform: ${AGENTNET_PLATFORM:-linux/amd64}
   working_dir: /app
   volumes:
-    - ./:/app
+    - ../..:/app
   entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
+  environment:
+    PYTHONPATH: /app/src/models:/app
+    GCS_BUCKET_NAME: ${GCS_BUCKET_NAME:-agentnet215}
+    GCS_DATA_DIR: ${GCS_DATA_DIR:-mcp_data_json}
+    GCS_CHROMA_DIR: ${GCS_CHROMA_DIR:-chroma_store}
   tty: true
   stdin_open: true
 
@@ -13,17 +18,22 @@ services:
   agentnet:
     <<: *agentnet-base
     build:
-      context: .
+      context: ../..
+      dockerfile: src/models/Dockerfile
     env_file:
       - .env
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse
+    security_opt:
+      - apparmor:unconfined
     volumes:
-      - ./:/app
-      - ./DB/chroma_store:/app/DB/chroma_store
+      - ../..:/app
     ports:
       - "${AGENTNET_WEB_PORT:-8000}:8000"
     environment:
       PORT: 8000
-      PYTHONPATH: /app
     command:
       [
         "uvicorn",
@@ -41,8 +51,15 @@ services:
   notion-agent:
     <<: *agentnet-base
     build:
-      context: .
+      context: ../..
+      dockerfile: src/models/Dockerfile
     env_file:
       - .env
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse
+    security_opt:
+      - apparmor:unconfined
     profiles: ["notion"]
-    command: ["python", "notion_agent.py", "--help"]
+    command: ["python", "-m", "notion_agent", "--help"]

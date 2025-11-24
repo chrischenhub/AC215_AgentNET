@@ -7,7 +7,7 @@ from typing import Any, Optional
 from RAG import PERSIST_DIR as DEFAULT_PERSIST_DIR, search_servers
 from notion_agent import run_smithery_task
 
-DEFAULT_TOP_SERVERS = 3
+DEFAULT_TOP_SERVERS = 5
 DEFAULT_K_TOOLS = 12
 
 

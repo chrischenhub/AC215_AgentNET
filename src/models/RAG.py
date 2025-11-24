@@ -14,10 +14,15 @@ from dotenv import load_dotenv
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 
+# Paths are rooted relative to this file so the service works regardless of CWD.
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data_mcpinfo"
+DEFAULT_CATALOG_PATH = DATA_DIR / "mcp_server_tools.json"
+PERSIST_DIR = BASE_DIR / "GCB"
+CATALOG_SIZE_STAMP = PERSIST_DIR / ".catalog_size"
+
 COLLECTION_NAME = "agents_v1"
-PERSIST_DIR = "GCB"
 EMBED_MODEL = "text-embedding-3-large"
-CATALOG_PATH = "Data/mcp_server_tools_core.json"
 DEFAULT_GCS_BUCKET = "agentnet215"
 DEFAULT_GCS_PREFIX = "chroma_store"
 GCS_PROJECT_ID = "charlesproject-471117"
@@ -42,9 +47,8 @@ class ToolChunk:
 def sanitize_description(desc: str) -> str:
     if not desc:
         return ""
-    # Strip all HTML-like tags and collapse whitespace. This is intentionally
-    # simple to avoid partial removals when tags are nested.
-    desc = re.sub(r"<[^>]+>", " ", desc)
+    desc = _TAG_BLOCK_RE.sub(" ", desc)
+    desc = _TAG_SINGLE_RE.sub(" ", desc)
     return re.sub(r"\s+", " ", desc).strip()
 
 
@@ -104,12 +108,12 @@ def build_tool_centric_chunks(catalog_json: dict[str, Any]) -> list[ToolChunk]:
     return chunks
 
 
-def load_json(path: str) -> dict[str, Any]:
-    with open(path, "r", encoding="utf-8") as handle:
+def load_json(path: str | Path) -> dict[str, Any]:
+    with open(Path(path), "r", encoding="utf-8") as handle:
         return json.load(handle)
 
 
-def index_chunks(catalog_path: str, persist_dir: str) -> tuple[Chroma, int]:  # pragma: no cover - requires live embeddings + persistence
+def index_chunks(catalog_path: Path, persist_dir: Path) -> tuple[Chroma, int]:
     catalog = load_json(catalog_path)
     chunks = build_tool_centric_chunks(catalog)
     texts = [chunk.text for chunk in chunks]
@@ -128,7 +132,7 @@ def index_chunks(catalog_path: str, persist_dir: str) -> tuple[Chroma, int]:  # 
     try:
         existing = Chroma(
             collection_name=COLLECTION_NAME,
-            persist_directory=persist_dir,
+            persist_directory=str(persist_dir),
             embedding_function=OpenAIEmbeddings(model=EMBED_MODEL),
         )
         existing.delete_collection()
@@ -138,7 +142,7 @@ def index_chunks(catalog_path: str, persist_dir: str) -> tuple[Chroma, int]:  # 
     embeddings = OpenAIEmbeddings(model=EMBED_MODEL)
     vectordb = Chroma(
         collection_name=COLLECTION_NAME,
-        persist_directory=persist_dir,
+        persist_directory=str(persist_dir),
         embedding_function=embeddings,
     )
     if texts:
@@ -152,109 +156,111 @@ def index_chunks(catalog_path: str, persist_dir: str) -> tuple[Chroma, int]:  # 
     return vectordb, len(texts)
 
 
-def chroma_persist_exists(persist_dir: str) -> bool:
-    if not os.path.isdir(persist_dir):
+def chroma_persist_exists(persist_dir: Path) -> bool:
+    if not persist_dir.is_dir():
         return False
     try:
-        files = set(os.listdir(persist_dir))
+        files = {p.name for p in persist_dir.iterdir()}
     except Exception:
         return False
-    return any(filename.startswith("chroma-") for filename in files)
+    return any(
+        filename.startswith("chroma-") or filename.startswith("index") or filename.endswith(".sqlite")
+        for filename in files
+    )
 
 
-def try_load_vectordb(persist_dir: str) -> Chroma | None:
+def try_load_vectordb(persist_dir: Path) -> Chroma | None:
     try:
         return Chroma(
             collection_name=COLLECTION_NAME,
-            persist_directory=persist_dir,
+            persist_directory=str(persist_dir),
             embedding_function=OpenAIEmbeddings(model=EMBED_MODEL),
         )
     except Exception:
         return None
 
 
-def sync_chroma_from_gcs(persist_dir: str) -> None:  # pragma: no cover - depends on external GCS state
-    """
-    Ensure the Chroma store is available locally by downloading it from GCS if needed.
-    """
-    bucket_name = os.getenv("CHROMA_GCS_BUCKET", DEFAULT_GCS_BUCKET)
-    if not bucket_name:
-        return
-
-    prefix = os.getenv("CHROMA_GCS_PREFIX", DEFAULT_GCS_PREFIX)
-    project_id = os.getenv("CHROMA_GCS_PROJECT", GCS_PROJECT_ID)
-    local_dir = Path(persist_dir)
-
-    if chroma_persist_exists(str(local_dir)):
-        return
-
-    local_dir.mkdir(parents=True, exist_ok=True)
-
-    credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-    if not credentials_path:
-        raise RuntimeError(
-            "Missing GOOGLE_APPLICATION_CREDENTIALS env var required for accessing GCS."
-        )
-    if not Path(credentials_path).exists():
-        raise RuntimeError(
-            f"GOOGLE_APPLICATION_CREDENTIALS points to missing file: {credentials_path}"
-        )
-
+def read_size_stamp(path: Path) -> int:
     try:
-        from google.cloud import storage  # type: ignore[import]
-        from google.api_core.exceptions import GoogleAPIError  # type: ignore[import]
-    except ImportError as exc:
-        raise RuntimeError(
-            "google-cloud-storage must be installed to download the Chroma DB from GCS."
-        ) from exc
-
-    client = storage.Client(project=project_id)
-    blobs = client.list_blobs(bucket_name, prefix=prefix)
-
-    synced_any = False
-    for blob in blobs:
-        blob_name = blob.name or ""
-        if not blob_name or blob_name.endswith("/"):
-            continue
-        relative_path = Path(blob_name)
-        if prefix:
-            try:
-                relative_path = relative_path.relative_to(prefix)
-            except ValueError:
-                pass
-        destination = local_dir / relative_path
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            blob.download_to_filename(str(destination))
-        except GoogleAPIError as exc:
-            raise RuntimeError(
-                f"Failed to download '{blob_name}' from bucket '{bucket_name}'."
-            ) from exc
-        synced_any = True
-
-    if not synced_any:
-        raise RuntimeError(
-            f"No Chroma files found in bucket '{bucket_name}' with prefix '{prefix}'."
-        )
+        return int(path.read_text().strip())
+    except Exception:
+        return -1
 
 
-def ensure_vectordb(catalog_path: str, persist_dir: str, force_reindex: bool = False) -> Chroma:  # pragma: no cover - integration with vector store
-    if not force_reindex:
-        sync_chroma_from_gcs(persist_dir)
+def write_size_stamp(path: Path, size: int) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(str(size))
 
-    if force_reindex or not chroma_persist_exists(persist_dir):
+
+def resolve_catalog_path(user_path: str | Path | None) -> Path:
+    """
+    Resolve the catalog JSON path. If user_path is provided (CLI/env), it must exist.
+    Otherwise fall back to common in-repo locations.
+    """
+
+    def normalize(candidate: str | Path) -> Path:
+        p = Path(candidate)
+        if not p.is_absolute():
+            p = (BASE_DIR / p).resolve()
+        return p
+
+    if user_path:
+        candidate = normalize(user_path)
+        if candidate.exists():
+            return candidate
+        raise FileNotFoundError(f"Catalog path not found: {candidate}")
+
+    fallbacks = [
+        DEFAULT_CATALOG_PATH,
+        DATA_DIR / "mcp_server_tools_core.json",
+        BASE_DIR / "Data" / "mcp_server_tools_core.json",
+        BASE_DIR / "Data" / "mcp_server_tools.json",
+    ]
+    for candidate in fallbacks:
+        if candidate.exists():
+            return candidate
+
+    searched = ", ".join(str(p) for p in fallbacks)
+    raise FileNotFoundError(f"No catalog JSON found. Searched: {searched}")
+
+
+def ensure_api_key() -> None:
+    if not os.getenv("OPENAI_API_KEY"):
+        raise RuntimeError("Missing OPENAI_API_KEY. Set it in your environment or .env file.")
+
+
+def catalog_size(path: Path) -> int:
+    return path.stat().st_size if path.exists() else -1
+
+
+def ensure_vectordb(
+    catalog_path: Path,
+    persist_dir: Path = PERSIST_DIR,
+    force_reindex: bool = False,
+) -> Chroma:
+    persist_dir.mkdir(parents=True, exist_ok=True)
+
+    current_size = catalog_size(catalog_path)
+    recorded_size = read_size_stamp(CATALOG_SIZE_STAMP)
+
+    needs_rebuild = force_reindex or not chroma_persist_exists(persist_dir) or current_size != recorded_size
+
+    if needs_rebuild:
         vectordb, _ = index_chunks(catalog_path, persist_dir)
+        write_size_stamp(CATALOG_SIZE_STAMP, current_size)
         return vectordb
 
     vectordb = try_load_vectordb(persist_dir)
     if vectordb is None:
         vectordb, _ = index_chunks(catalog_path, persist_dir)
+        write_size_stamp(CATALOG_SIZE_STAMP, current_size)
         return vectordb
 
     try:
         vectordb.similarity_search("probe", k=1)
     except Exception:
         vectordb, _ = index_chunks(catalog_path, persist_dir)
+        write_size_stamp(CATALOG_SIZE_STAMP, current_size)
         return vectordb
 
     return vectordb
@@ -264,7 +270,7 @@ def score_and_rank_servers(
     query: str,
     vectordb: Chroma,
     k_tools: int = 12,
-    top_servers: int = 3,
+    top_servers: int = 5,
 ) -> list[dict[str, Any]]:
     docs = vectordb.similarity_search(query, k=k_tools)
 
@@ -314,27 +320,23 @@ def score_and_rank_servers(
     return results
 
 
-def ensure_api_key() -> None:
-    if not os.getenv("OPENAI_API_KEY"):
-        raise RuntimeError("Missing OPENAI_API_KEY. Set it in your environment or .env file.")
-
-
 def search_servers(
     query: str,
-    persist_dir: str = PERSIST_DIR,
+    persist_dir: Path = PERSIST_DIR,
     *,
     catalog_path: str | None = None,
-    top_servers: int = 3,
+    top_servers: int = 5,
     k_tools: int = 12,
     force_reindex: bool = False,
-) -> list[dict[str, Any]]:  # pragma: no cover - requires OpenAI + vector store setup
+) -> list[dict[str, Any]]:
     """
-    Convenience wrapper to run a single RAG search and return ranked servers.
+    Run a single RAG search and return ranked servers.
     """
     load_dotenv()
     ensure_api_key()
-    catalog = catalog_path or os.getenv("MCP_SERVER_CATALOG_PATH", CATALOG_PATH)
-    vectordb = ensure_vectordb(catalog, persist_dir, force_reindex=force_reindex)
+    env_catalog = os.getenv("MCP_SERVER_CATALOG_PATH")
+    resolved_catalog = resolve_catalog_path(catalog_path or env_catalog)
+    vectordb = ensure_vectordb(resolved_catalog, persist_dir, force_reindex=force_reindex)
     return score_and_rank_servers(
         query,
         vectordb,
@@ -360,7 +362,7 @@ def parse_args() -> argparse.Namespace:
     )
     ingest_parser.add_argument(
         "--persist-dir",
-        default=PERSIST_DIR,
+        default=str(PERSIST_DIR),
         help=f"Directory to persist the Chroma DB (default: {PERSIST_DIR}).",
     )
 
@@ -375,7 +377,7 @@ def parse_args() -> argparse.Namespace:
     )
     search_parser.add_argument(
         "--persist-dir",
-        default=PERSIST_DIR,
+        default=str(PERSIST_DIR),
         help=f"Directory containing the Chroma DB (default: {PERSIST_DIR}).",
     )
     search_parser.add_argument(
@@ -396,25 +398,28 @@ def parse_args() -> argparse.Namespace:
     search_parser.add_argument(
         "--top-servers",
         type=int,
-        default=3,
-        help="Number of servers to return (default: 3).",
+        default=5,
+        help="Number of servers to return (default: 5).",
     )
 
     return parser.parse_args()
 
 
-def main() -> None:  # pragma: no cover - CLI entry point
+def main() -> None:
     args = parse_args()
 
     if args.command == "ingest":
         load_dotenv()
         ensure_api_key()
-        _, chunk_count = index_chunks(args.json, args.persist_dir)
+        persist_dir = Path(args.persist_dir)
+        catalog_path = resolve_catalog_path(args.json)
+        _, chunk_count = index_chunks(catalog_path, persist_dir)
+        write_size_stamp(CATALOG_SIZE_STAMP, catalog_size(catalog_path))
         print(
             json.dumps(
                 {
                     "collection": COLLECTION_NAME,
-                    "persist_dir": args.persist_dir,
+                    "persist_dir": str(persist_dir),
                     "chunks_indexed": chunk_count,
                 },
                 indent=2,
@@ -426,13 +431,13 @@ def main() -> None:  # pragma: no cover - CLI entry point
     if args.command == "search":
         results = search_servers(
             args.q,
-            args.persist_dir,
+            Path(args.persist_dir),
             catalog_path=args.catalog,
             k_tools=args.k_tools,
             top_servers=args.top_servers,
             force_reindex=args.reindex,
         )
-        output_key = "top_3_servers" if args.top_servers == 3 else "top_servers"
+        output_key = "top_5_servers" if args.top_servers == 5 else "top_servers"
         print(json.dumps({output_key: results}, indent=2, ensure_ascii=False))
 
 

@@ -1,0 +1,36 @@
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual envs
+.venv/
+venv/
+ENV/
+
+# Node / npm
+node_modules/
+
+# DVC data + locks (actual data is bind-mounted)
+Data/
+.dvc/cache/
+.dvc/tmp/
+.dvc/plots/
+.dvc/cache.lock
+.dvc.lock
+Data.dvc.lock
+
+# Local caches and datasets
+.cache/
+DB/chroma_store/
+GCB/
+logs/
+
+# Secrets
+.env
+.env.local
+secrets/
+
+# Git metadata
+.git
+.gitignore

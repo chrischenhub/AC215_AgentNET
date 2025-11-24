@@ -277,8 +277,7 @@ form.addEventListener("submit", async (event) => {
       return;
     }
 
-    showStatus("Running Notion agent...");
-    await runAgentWithIndex(0);
+    showStatus("Select a server to run the agent.");
   } catch (error) {
     showStatus(error.message || "Something went wrong.", "error");
   } finally {

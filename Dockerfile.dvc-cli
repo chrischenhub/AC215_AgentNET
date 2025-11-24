@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1.7
+FROM python:3.12-slim-bookworm
+
+SHELL ["/bin/bash", "-c"]
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    LANG=C.UTF-8 \
+    APP_ROOT=/app \
+    GOOGLE_APPLICATION_CREDENTIALS=src/models/secrets/service-account.json \
+    GCS_BUCKET_NAME=agentnet215
+
+WORKDIR /app
+
+RUN set -euo pipefail \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends \
+      build-essential git curl ca-certificates gnupg lsb-release fuse3 \
+ && curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+      | gpg --dearmor -o /etc/apt/trusted.gpg.d/google-cloud.gpg \
+ && echo "deb [signed-by=/etc/apt/trusted.gpg.d/google-cloud.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
+      > /etc/apt/sources.list.d/google-cloud-sdk.list \
+ && export GCSFUSE_REPO="gcsfuse-$(lsb_release -c -s)" \
+ && echo "deb [signed-by=/etc/apt/trusted.gpg.d/google-cloud.gpg] https://packages.cloud.google.com/apt ${GCSFUSE_REPO} main" \
+      > /etc/apt/sources.list.d/gcsfuse.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends google-cloud-sdk gcsfuse \
+ && pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir "dvc[gcs]" dvc-gs \
+ && echo "user_allow_other" >> /etc/fuse.conf \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY dvc-docker-entrypoint.sh /usr/local/bin/dvc-docker-entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/dvc-docker-entrypoint.sh \
+ && chmod +x /usr/local/bin/dvc-docker-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/dvc-docker-entrypoint.sh"]
+CMD ["/bin/bash"]

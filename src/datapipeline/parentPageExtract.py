@@ -1,9 +1,9 @@
 """
 Utilities for scraping verified MCP server metadata from Smithery.
 
-This module fetches the first five listing pages, caches their HTML locally,
-extracts each server's name, relative child link, and short description, and
-stores the results in `Data/mcp_servers.csv`.
+This module fetches verified MCP server metadata from Smithery's servers page,
+caches the HTML locally, extracts each server's name, relative child link, and
+short description, and stores the results in `data_mcpinfo/mcp_servers.csv`.
 """
 
 from __future__ import annotations
@@ -22,17 +22,18 @@ from requests.exceptions import HTTPError, RequestException
 
 
 BASE_URL = "https://smithery.ai"
-SEARCH_PATH = "/search"
-SEARCH_QUERY = "is:verified"
-TOTAL_PAGES = 1  # base page + four additional pages
+SEARCH_PATH = "/servers"
+SEARCH_QUERY = "google is:verified"
+TOTAL_PAGES = 1
 REQUEST_PAUSE_SECONDS = 1.0
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/126.0.0.0 Safari/537.36"
 )
-PROJECT_ROOT = Path(__file__).parent
-DATA_DIR = PROJECT_ROOT / "Data"
+PROJECT_ROOT = Path(__file__).resolve().parent
+# data_mcpinfo lives under src/models; anchor relative to this script
+DATA_DIR = PROJECT_ROOT.parent / "models" / "data_mcpinfo"
 OUTPUT_CSV = DATA_DIR / "mcp_servers.csv"
 HTML_OUTPUT_DIR = DATA_DIR / "HTMLData"
 
@@ -70,7 +71,7 @@ def fetch_search_pages(session: Session, total_pages: int) -> Iterator[str]:
             params.pop("page", None)
 
         url = f"{BASE_URL}{SEARCH_PATH}"
-        logger.info("Fetching page %s → %s", page_number, url)
+        logger.info("Fetching page %s -> %s", page_number, url)
         response = perform_request(session, url, params=params)
         html_text = response.text
 
@@ -99,25 +100,28 @@ def perform_request(session: Session, url: str, *, params: dict | None = None) -
 def parse_servers(html: str) -> List[MCPServer]:
     """Extract MCP server entries from a Smithery search page."""
     soup = BeautifulSoup(html, "html.parser")
-    anchors = soup.select(
-        "a[role='listitem'][class*='hover:shadow-primary'][href^='/server/']"
-    )
+    anchors = soup.select("a[href^='/server/'] h3.text-base.font-semibold")
     servers: List[MCPServer] = []
 
-    for anchor in anchors:
-        name_tag = anchor.select_one("h3.text-base.font-semibold") or anchor.select_one("h3")
-        description_tag = anchor.select_one(
-            "p.text-muted-foreground.text-sm.leading-relaxed"
-        ) or anchor.select_one("p")
-        href = anchor.get("href")
-
-        if not (name_tag and description_tag and href):
-            # Skip incomplete entries.
+    for h3 in anchors:
+        anchor = h3.find_parent("a", href=True)
+        if not anchor:
             continue
 
-        name = name_tag.get_text(strip=True)
-        description = description_tag.get_text(" ", strip=True)
-        child_link = href.strip()
+        name = h3.get_text(strip=True)
+        child_link = anchor.get("href", "").strip()
+
+        slug_tag = anchor.find("div", class_="text-muted-foreground")
+        slug_text = slug_tag.get_text(strip=True) if slug_tag else ""
+        if not child_link and slug_text:
+            child_link = f"/server/{slug_text}"
+
+        desc_tag = anchor.find("p", class_="text-muted-foreground")
+        description = desc_tag.get_text(" ", strip=True) if desc_tag else ""
+
+        if not (name and child_link):
+            continue
+
         servers.append(MCPServer(name=name, child_link=child_link, description=description))
 
     return servers

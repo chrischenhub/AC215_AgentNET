@@ -15,6 +15,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
+import re
 from urllib.parse import urljoin, urlencode
 
 import requests
@@ -24,9 +25,8 @@ from requests.exceptions import HTTPError, RequestException
 
 
 BASE_URL = "https://smithery.ai"
-SERVERS_CSV_PATH = Path("Data/mcp_servers.csv")
-OUTPUT_CSV_PATH = Path("Data/mcp_server_tools.csv")
-HTML_CACHE_DIR = Path("Data/HTMLData/server_details")
+SERVERS_CSV_PATH = Path("src/datapipeline/Data/mcp_servers.csv")
+OUTPUT_CSV_PATH = Path("src/datapipeline/Data/mcp_server_tools.csv")
 REQUEST_PAUSE_SECONDS = 1.0
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -96,42 +96,30 @@ def scrape_server_tools(session: Session, server: ServerRecord) -> List[Tool]:
     if not html:
         return []
 
-    cache_html(server, 1, html)
-    tool_dicts = extract_tool_dicts(html)
-    if not tool_dicts:
-        logger.info("No server payload found for %s", server.child_link)
-        return []
-
-    description_lookup = build_description_lookup(html)
     tools: List[Tool] = []
-    for tool_data in tool_dicts:
-        raw_title = (
-            tool_data.get("title")
-            or tool_data.get("annotations", {}).get("title")
-            or tool_data.get("name")
-            or ""
-        )
-        display_name, slug = split_tool_label(raw_title)
-        slug = slug or tool_data.get("name")
-        description_token = tool_data.get("description") or ""
-        description = resolve_description(
-            description_token, description_lookup, slug, display_name
-        )
-        parameters = extract_parameters_from_schema(tool_data.get("inputSchema") or {})
-        tools.append(Tool(name=display_name, slug=slug, description=description, parameters=parameters))
+    total_pages = extract_total_pages(html)
+
+    tools.extend(parse_tools_from_html(html))
+
+    for page in range(2, total_pages + 1):
+        time.sleep(REQUEST_PAUSE_SECONDS)
+        next_html = fetch_server_page(session, server.child_link, page=page)
+        if not next_html:
+            break
+        tools.extend(parse_tools_from_html(next_html))
 
     return tools
 
 
 def fetch_server_page(session: Session, child_link: str, *, page: int) -> Optional[str]:
     """Fetch a server detail page, handling pagination via query params."""
-    full_url = urljoin(BASE_URL, child_link)
+    full_url = f"{BASE_URL}{child_link}"
+    params = {}
     if page > 1:
-        separator = "&" if "?" in full_url else "?"
-        full_url = f"{full_url}{separator}{urlencode({'page': page})}"
+        params.update({"capability": "tools", "page": page})
 
     try:
-        response = session.get(full_url, timeout=30)
+        response = session.get(full_url, params=params, timeout=30)
         response.raise_for_status()
         return response.text
     except HTTPError as exc:
@@ -141,140 +129,74 @@ def fetch_server_page(session: Session, child_link: str, *, page: int) -> Option
     return None
 
 
-def cache_html(server: ServerRecord, page: int, html: str) -> None:
-    """Persist raw HTML for inspection."""
-    slug = server.child_link.strip("/").replace("/", "_") or server.server_id
-    HTML_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    filename = f"{slug}_page{page}.html"
-    (HTML_CACHE_DIR / filename).write_text(html, encoding="utf-8")
-
-
-def extract_tool_dicts(html: str) -> List[Dict]:
-    """Extract the list of tool dictionaries from the embedded scripts."""
+def extract_total_pages(html: str) -> int:
+    """Inspect pagination indicator like '1 / 6' to determine total pages."""
     soup = BeautifulSoup(html, "html.parser")
-    scripts = [script for script in soup.find_all("script") if script.string]
-
-    for script in scripts:
-        decoded = bytes(script.string, "utf-8").decode("unicode_escape")
-        idx = decoded.find('"tools":')
-        if idx == -1:
-            continue
-        array_str = extract_json_array(decoded, idx + len('"tools":'))
-        if not array_str:
-            continue
-        try:
-            return json.loads(array_str)
-        except json.JSONDecodeError:
-            logger.debug("Failed to decode tools array")
-            continue
-
-    return []
+    span = soup.find("span", string=re.compile(r"\d+\s*/\s*\d+"))
+    if span:
+        match = re.search(r"\d+\s*/\s*(\d+)", span.get_text(" ", strip=True))
+        if match:
+            try:
+                return max(1, int(match.group(1)))
+            except ValueError:
+                pass
+    return 1
 
 
-def extract_json_array(buffer: str, start_idx: int) -> Optional[str]:
-    """Extract a JSON array substring starting near `start_idx`."""
-    length = len(buffer)
-    while start_idx < length and buffer[start_idx] not in "[[":
-        start_idx += 1
-
-    if start_idx >= length or buffer[start_idx] != "[":
-        return None
-
-    bracket_depth = 0
-    in_string = False
-    escape = False
-    for position in range(start_idx, length):
-        char = buffer[position]
-        if escape:
-            escape = False
-            continue
-        if char == "\\":
-            escape = True
-            continue
-        if char == '"':
-            in_string = not in_string
-            continue
-        if in_string:
-            continue
-        if char == "[":
-            bracket_depth += 1
-        elif char == "]":
-            bracket_depth -= 1
-            if bracket_depth == 0:
-                return buffer[start_idx : position + 1]
-    return None
-
-
-def build_description_lookup(html: str) -> Dict[str, str]:
-    """Build a lookup from RSC description tokens to plain text snippets."""
-    lookup: Dict[str, str] = {}
+def parse_tools_from_html(html: str) -> List[Tool]:
+    """Parse tool cards from the new Smithery server detail layout."""
     soup = BeautifulSoup(html, "html.parser")
-    for div in soup.find_all("div", class_=lambda c: c and "border" in c.split()):
-        header = div.find("h3")
-        if not header:
+    tool_cards = soup.select("details.group.border.rounded-md")
+    tools: List[Tool] = []
+
+    for card in tool_cards:
+        title_tag = card.select_one("summary h3.font-medium")
+        if not title_tag:
             continue
-        raw_label = normalize_text(header.get_text(" ", strip=True))
-        display_name, slug = split_tool_label(raw_label)
-        description = ""
-        desc_block = div.find("div", class_=lambda c: c and "text-[14px]" in c)
-        if desc_block:
-            first_paragraph = desc_block.find("p")
-            if first_paragraph:
-                description = normalize_text(first_paragraph.get_text(" ", strip=True))
-            else:
-                description = normalize_text(desc_block.get_text(" ", strip=True))
-        key = slug or display_name
-        if key and description:
-            lookup[key] = description
-    return lookup
+        raw_title = normalize_text(title_tag.get_text(" ", strip=True))
+        name, slug = split_tool_label(raw_title)
 
+        desc_tag = card.select_one("summary p")
+        description = normalize_text(desc_tag.get_text(" ", strip=True)) if desc_tag else ""
 
-def resolve_description(
-    description_field: str,
-    description_lookup: Dict[str, str],
-    slug: Optional[str],
-    fallback_name: str,
-) -> str:
-    """Resolve tool description, accounting for RSC token indirection."""
-    if not description_field:
-        return ""
-    if not description_field.startswith("$"):
-        return normalize_text(description_field)
+        parameters: List[ToolParameter] = []
+        param_section = card.find("h4", string=re.compile("Parameters", re.IGNORECASE))
+        if param_section:
+            param_blocks = param_section.find_next("div").find_all("div", class_=lambda c: c and "space-y-2" in c)
+            for block in param_blocks:
+                name_tag = block.find("span", class_=lambda c: c and "text-sm" in c)
+                type_tag = block.find("div", class_=lambda c: c and "inline-flex" in c)
+                desc_block = block.find("p")
 
-    if slug and slug in description_lookup:
-        return description_lookup[slug]
+                if not name_tag:
+                    continue
 
-    if fallback_name and fallback_name in description_lookup:
-        return description_lookup[fallback_name]
+                param_name_raw = name_tag.get_text(" ", strip=True)
+                required = "*required" in param_name_raw
+                param_name = param_name_raw.replace("*required", "").strip()
 
-    # Attempt secondary lookup by token (rarely available).
-    token = description_field.lstrip("$")
-    return description_lookup.get(token, fallback_name)
+                param_type = normalize_text(type_tag.get_text(" ", strip=True)) if type_tag else ""
+                param_desc = normalize_text(desc_block.get_text(" ", strip=True)) if desc_block else ""
 
+                parameters.append(
+                    ToolParameter(
+                        name=param_name,
+                        description=param_desc,
+                        param_type=param_type or None,
+                        required=required,
+                    )
+                )
 
-def extract_parameters_from_schema(schema: Dict) -> List[ToolParameter]:
-    """Extract parameters from a JSON schema definition."""
-    properties = schema.get("properties") or {}
-    required_params = set(schema.get("required") or [])
-
-    parameters: List[ToolParameter] = []
-    for name, definition in properties.items():
-        description = normalize_text(str(definition.get("description") or ""))
-        param_type = ""
-        if "type" in definition:
-            if isinstance(definition["type"], list):
-                param_type = ",".join(str(t) for t in definition["type"])
-            else:
-                param_type = str(definition["type"])
-        parameter = ToolParameter(
-            name=name,
-            description=description,
-            param_type=param_type or None,
-            required=name in required_params,
+        tools.append(
+            Tool(
+                name=name,
+                slug=slug,
+                description=description,
+                parameters=parameters,
+            )
         )
-        parameters.append(parameter)
 
-    return parameters
+    return tools
 
 
 def split_tool_label(label: str) -> tuple[str, Optional[str]]:
@@ -339,12 +261,14 @@ def _format_required(required: Optional[bool]) -> str:
 
 
 def write_output_csv(rows: Iterable[Dict[str, Optional[str]]], output_path: Path = OUTPUT_CSV_PATH) -> None:
-    """Write flattened rows to CSV."""
+    """Append flattened rows to CSV (writing header only when file is new/empty)."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     rows = list(rows)
     if not rows:
         logger.warning("No tool data collected; skipping CSV write.")
         return
+
+    write_header = not output_path.exists() or output_path.stat().st_size == 0
 
     fieldnames = [
         "server_id",
@@ -359,12 +283,13 @@ def write_output_csv(rows: Iterable[Dict[str, Optional[str]]], output_path: Path
         "parameter_description",
     ]
 
-    with output_path.open("w", newline="", encoding="utf-8") as outfile:
+    with output_path.open("a", newline="", encoding="utf-8") as outfile:
         writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-        writer.writeheader()
+        if write_header:
+            writer.writeheader()
         writer.writerows(rows)
 
-    logger.info("Saved %s rows to %s", len(rows), output_path)
+    logger.info("Appended %s rows to %s", len(rows), output_path)
 
 
 def main() -> None:

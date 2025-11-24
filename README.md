@@ -23,15 +23,20 @@
 3. create a folder `GCB` to store the ChromaDB mounted from google cloud bucket.
 
 
-2. Build the image and start the stack (Postgres + dev container):
+4. Build the image and start the stack (Postgres + dev container):
    ```bash
-   docker compose up -d --build
+   docker compose -f src/models/docker-compose.yml up --build
    ```
 
-3. Execute the workflow RAG search + MCP
+5. Execute the workflow RAG search + MCP
     ```
     docker compose exec agentnet python main.py "What do you want to do"
     ```
+
+6. Only Initiate the Docker image, but not the webapp
+   ```
+   docker compose -f src/models/docker-compose.yml run --rm agentnet /bin/bash
+   ```
 ## Front End (under models/static)
 
 1. Built as a lightweight FastAPI site (`app.py`) that serves templates/index.html plus the static bundle in `static/app.js` and `static/styles.css`.
@@ -40,7 +45,7 @@
 
 3. `styles.css` supplies the glassmorphism look-and-feel, responsive layout, and accessibility-centric focus states.
 
-4. Launch locally with docker compose up agentnet (or uvicorn app:create_app --reload inside the container) and visit http://localhost:8000 to use the browser client.
+4. Launch locally with `docker compose -f src/models/docker-compose.yml up` (or uvicorn app:create_app --reload inside the container) and visit http://localhost:8000 to use the browser client.
 
 Interface:
 ![alt text](Image/frontend.png)

@@ -1,0 +1,6 @@
+[core]
+    remote = src/models/data_mcpinfo
+['remote "data_mcpinfo"']
+    url = gs://agentnet215/dvc_store
+['remote "src/models/data_mcpinfo"']
+    url = gs://agentnet215/dvc_store
