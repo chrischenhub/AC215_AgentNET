@@ -27,9 +27,6 @@ DEFAULT_GCS_BUCKET = "agentnet215"
 DEFAULT_GCS_PREFIX = "chroma_store"
 GCS_PROJECT_ID = "charlesproject-471117"
 
-_TAG_BLOCK_RE = re.compile(r"<[^>]+>(.*?)</[^>]+>", flags=re.DOTALL)
-_TAG_SINGLE_RE = re.compile(r"<[^>/]+(?:/?)>", flags=re.DOTALL)
-
 
 @dataclass
 class ToolChunk:
@@ -47,8 +44,8 @@ class ToolChunk:
 def sanitize_description(desc: str) -> str:
     if not desc:
         return ""
-    desc = _TAG_BLOCK_RE.sub(" ", desc)
-    desc = _TAG_SINGLE_RE.sub(" ", desc)
+    # Strip any HTML-like tags and collapse whitespace.
+    desc = re.sub(r"<[^>]+>", " ", desc)
     return re.sub(r"\s+", " ", desc).strip()
 
 
@@ -156,11 +153,12 @@ def index_chunks(catalog_path: Path, persist_dir: Path) -> tuple[Chroma, int]:
     return vectordb, len(texts)
 
 
-def chroma_persist_exists(persist_dir: Path) -> bool:
-    if not persist_dir.is_dir():
+def chroma_persist_exists(persist_dir: Path | str) -> bool:
+    path = Path(persist_dir)
+    if not path.is_dir():
         return False
     try:
-        files = {p.name for p in persist_dir.iterdir()}
+        files = {p.name for p in path.iterdir()}
     except Exception:
         return False
     return any(
