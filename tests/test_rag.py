@@ -16,32 +16,22 @@ def test_summarize_intent_uses_fallback_when_missing() -> None:
     assert RAG.summarize_intent("", fallback="fallback") == "fallback"
 
 
-def test_build_tool_centric_chunks_creates_text_and_metadata() -> None:
+def test_build_server_chunks_creates_text_and_metadata() -> None:
     catalog = {
-        "srv1": {
+        "/server/one": {
             "server_id": "srv1",
             "name": "Server One",
             "child_link": "/server/one",
-            "tools": [
-                {
-                    "name": "Create Page",
-                    "slug": "create-page",
-                    "description": "<div>Make a page.</div>",
-                    "parameters": [
-                        {"name": "title", "type": "string", "required": True},
-                        {"name": "body", "type": "string", "required": False},
-                    ],
-                }
-            ],
+            "description": "<div>Make a page.</div>",
         }
     }
 
-    chunks = RAG.build_tool_centric_chunks(catalog)
+    chunks = RAG.build_server_chunks(catalog)
     assert len(chunks) == 1
     chunk = chunks[0]
-    assert chunk.tool_name == "Create Page"
+    assert chunk.server_name == "Server One"
     assert "Make a page." in chunk.text
-    assert chunk.required_params == ["title"]
+    assert chunk.child_link == "/server/one"
 
 
 def test_chroma_persist_exists_detects_chroma_files(tmp_path: Path) -> None:
@@ -66,16 +56,16 @@ def test_score_and_rank_servers_orders_by_weight() -> None:
 
     docs = [
         DummyDoc(
-            metadata={"server_name": "A", "tool_name": "alpha", "child_link": "/server/a"},
-            page_content="[Server: A]\nUse for: alpha task\nParams: none",
+            metadata={"server_name": "A", "child_link": "/server/a"},
+            page_content="[Server: A]\nUse for: alpha task",
         ),
         DummyDoc(
-            metadata={"server_name": "B", "tool_name": "beta", "child_link": "/server/b"},
-            page_content="[Server: B]\nUse for: beta task\nParams: none",
+            metadata={"server_name": "B", "child_link": "/server/b"},
+            page_content="[Server: B]\nUse for: beta task",
         ),
         DummyDoc(
-            metadata={"server_name": "A", "tool_name": "alpha-2", "child_link": "/server/a"},
-            page_content="[Server: A]\nUse for: another alpha\nParams: none",
+            metadata={"server_name": "A", "child_link": "/server/a"},
+            page_content="[Server: A]\nUse for: another alpha",
         ),
     ]
     vectordb = DummyVectorDB(docs)
