@@ -47,6 +47,7 @@
 
 4. Launch locally with `docker compose -f src/models/docker-compose.yml up` (or uvicorn app:create_app --reload inside the container) and visit http://localhost:8000 to use the browser client.
 
+
 Interface:
 ![alt text](Image/frontend.png)
 
@@ -86,3 +87,5 @@ Results from Notion page:
 - Lint: `flake8 src/models tests`
 - Tests with coverage (fails under 50% by config): `pytest`
 - GitHub Actions runs the same steps on every push/PR via `.github/workflows/ci.yml` (checkout → install deps → byte-compile → lint → pytest with coverage).
+
+# **Frontend ↔ Backend wiring:** FastAPI (`src/models/app.py`) serves the template + static bundle and exposes two endpoints the browser calls. `/api/search` runs `async_rag_search`, which pulls embeddings from the Chroma store at `DB/chroma_store` (populated by the data pipeline that writes `Data/mcp_server_tools.json` → `RAG.py` indexing). `/api/execute` forwards the chosen server to `execute_mcp_workflow`, which runs the model/tooling stack and streams the result back to the UI.
