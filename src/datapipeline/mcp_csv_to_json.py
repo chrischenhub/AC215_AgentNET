@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, MutableMapping, Optional
 
 
-DEFAULT_INPUT = Path("Data/mcp_server_tools.csv")
-DEFAULT_OUTPUT = Path("Data/mcp_server_tools.json")
+DEFAULT_INPUT = Path("src/datapipeline/Data/mcp_server_tools.csv")
+DEFAULT_OUTPUT = Path("src/datapipeline/Data/mcp_server_tools.json")
 
 
 def parse_required_flag(raw_value: Optional[str]) -> Optional[bool]:
@@ -27,21 +27,62 @@ def parse_required_flag(raw_value: Optional[str]) -> Optional[bool]:
 
 
 def convert_rowset(rows: Iterable[Dict[str, str]]) -> MutableMapping[str, Any]:
-    """Group tools and parameters by server."""
+    """Group tools and parameters by server, ensuring unique server_ids."""
     servers: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
+    used_ids: set[str] = set()
+
+    # Precompute a unique server_id per child_link (or name fallback)
+    id_map: Dict[str, str] = {}
+    max_id = 0
+    for row in rows:
+        raw_id = (row.get("server_id") or "").strip()
+        child_link = (row.get("child_link") or "").strip()
+        name = (row.get("server_name") or "").strip()
+        key = child_link or name
+        if not key:
+            continue
+
+        candidate_id: Optional[int] = None
+        if raw_id.isdigit():
+            candidate_id = int(raw_id)
+        if candidate_id:
+            max_id = max(max_id, candidate_id)
+            if raw_id not in used_ids:
+                id_map[key] = raw_id
+                used_ids.add(raw_id)
+
+    next_id = max_id + 1 if max_id else 1
+
+    def assign_id(child_link: str, name: str, raw_id: str) -> str:
+        nonlocal next_id
+        key = child_link or name
+        if key in id_map:
+            return id_map[key]
+        if raw_id and raw_id not in used_ids:
+            id_map[key] = raw_id
+            used_ids.add(raw_id)
+            return raw_id
+        new_id = str(next_id)
+        next_id += 1
+        id_map[key] = new_id
+        used_ids.add(new_id)
+        return new_id
 
     for row in rows:
-        server_key = (row.get("server_name") or row.get("server_id") or "").strip()
+        child_link = (row.get("child_link") or "").strip()
+        name = (row.get("server_name") or "").strip()
+        server_id = assign_id(child_link, name, (row.get("server_id") or "").strip())
+
+        server_key = child_link or name or server_id
         if not server_key:
-            # Skip rows that are missing a server identifier.
             continue
 
         server_record = servers.setdefault(
             server_key,
             {
-                "server_id": (row.get("server_id") or "").strip() or None,
-                "name": (row.get("server_name") or "").strip(),
-                "child_link": (row.get("child_link") or "").strip() or None,
+                "server_id": server_id,
+                "name": name,
+                "child_link": child_link or None,
                 "description": (row.get("server_description") or row.get("description") or "").strip(),
                 "tools": OrderedDict(),
             },
@@ -49,7 +90,6 @@ def convert_rowset(rows: Iterable[Dict[str, str]]) -> MutableMapping[str, Any]:
 
         tool_key = (row.get("tool_slug") or row.get("tool_name") or "").strip()
         if not tool_key:
-            # No tool metadata to aggregate.
             continue
 
         tools: "OrderedDict[str, Dict[str, Any]]" = server_record["tools"]

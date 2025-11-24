@@ -32,7 +32,9 @@ GCB/
 node_modules/
 
 # Misc data artifacts
-#Data/mcp_server_tools.json
+/Data
+/Data/HTMLData
+src/datapipeline/Data/
 .cache
 /src/models/GCB
 /src/models/secrets
