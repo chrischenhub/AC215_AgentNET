@@ -16,9 +16,14 @@ from langchain_openai import OpenAIEmbeddings
 
 # Paths are rooted relative to this file so the service works regardless of CWD.
 BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "Data"
-DEFAULT_DESCRIPTION_PATH = DATA_DIR / "mcp_description.json"
-PERSIST_DIR = BASE_DIR / "GCB_description"
+DATA_DIR = BASE_DIR / "data_mcpinfo"
+DEFAULT_DESCRIPTION_PATH = DATA_DIR / "mcp_description.jsonn"
+DESCRIPTION_CANDIDATES = [
+    DEFAULT_DESCRIPTION_PATH,
+    DATA_DIR / "mcp_description.json",
+    BASE_DIR / "Data" / "mcp_description.json",
+]
+PERSIST_DIR = BASE_DIR / "GCB"
 CATALOG_SIZE_STAMP = PERSIST_DIR / ".catalog_size"
 
 COLLECTION_NAME = "servers_v1"
@@ -176,10 +181,7 @@ def resolve_catalog_path(user_path: str | Path | None) -> Path:
             return candidate
         raise FileNotFoundError(f"Description path not found: {candidate}")
 
-    fallbacks = [
-        DEFAULT_DESCRIPTION_PATH,
-        DATA_DIR / "mcp_description.json",
-    ]
+    fallbacks = [normalize(candidate) for candidate in DESCRIPTION_CANDIDATES]
     for candidate in fallbacks:
         if candidate.exists():
             return candidate
