@@ -134,7 +134,7 @@ const renderResults = (results) => {
         return;
       }
       setBusy(true);
-      showStatus(`Running Notion agent using ${item.server || "selected server"}...`);
+      showStatus(`Running AgentNet through ${item.server || "selected server"}...`);
       try {
         await runAgentWithIndex(index);
       } catch (error) {

@@ -32,7 +32,7 @@ class SearchPayload(BaseModel):
     query: str = Field(..., description="Natural language query for the RAG search.")
     notion_instruction: str | None = Field(
         None,
-        description="Optional instruction for the Notion agent. Defaults to the query when omitted.",
+        description="Optional instruction for the Agent. Defaults to the query when omitted.",
     )
     persist_dir: str = Field(
         DEFAULT_PERSIST_DIR,
@@ -60,7 +60,7 @@ class SearchPayload(BaseModel):
 
 
 class ExecutePayload(BaseModel):
-    notion_instruction: str = Field(..., description="Instruction to send to the Notion agent.")
+    notion_instruction: str = Field(..., description="Instruction to send to the AgentNet.")
     child_link: str = Field(..., description="MCP child link for the selected server.")
     server_name: str | None = Field(
         None,

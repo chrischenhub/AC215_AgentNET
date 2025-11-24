@@ -73,6 +73,15 @@ SMITHERY_MCP_PROFILES: dict[str, SmitheryMCPProfile] = {
             "Cite the documentation you retrieved, highlight key findings, and recommend follow-up steps when applicable.",
         ],
     ),
+    # "gmail": SmitheryMCPProfile(
+    #     slug="gmail",
+    #     display_name="Gmail",
+    #     instruction_lines=[
+    #         "You are a Gmail automation agent.",
+    #         "Use the connected Gmail tools to search, read, compose, and update messages, labels, and threads.",
+    #         "Ask for clarification before sending if intent is ambiguous, and confirm recipients before dispatching emails.",
+    #     ],
+    # ),
 }
 
 

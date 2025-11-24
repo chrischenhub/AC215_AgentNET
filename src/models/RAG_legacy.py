@@ -16,21 +16,28 @@ from langchain_openai import OpenAIEmbeddings
 
 # Paths are rooted relative to this file so the service works regardless of CWD.
 BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "Data"
-DEFAULT_DESCRIPTION_PATH = DATA_DIR / "mcp_description.json"
-PERSIST_DIR = BASE_DIR / "GCB_description"
+DATA_DIR = BASE_DIR / "data_mcpinfo"
+DEFAULT_CATALOG_PATH = DATA_DIR / "mcp_server_tools.json"
+PERSIST_DIR = BASE_DIR / "GCB"
 CATALOG_SIZE_STAMP = PERSIST_DIR / ".catalog_size"
 
-COLLECTION_NAME = "servers_v1"
+COLLECTION_NAME = "agents_v1"
 EMBED_MODEL = "text-embedding-3-large"
+DEFAULT_GCS_BUCKET = "agentnet215"
+DEFAULT_GCS_PREFIX = "chroma_store"
+GCS_PROJECT_ID = "charlesproject-471117"
 
 
 @dataclass
-class ServerChunk:
+class ToolChunk:
     server_id: str
     server_name: str
     child_link: str
-    description: str
+    tool_name: str
+    tool_slug: str
+    tool_desc: str
+    required_params: list[str]
+    all_params: list[dict[str, Any]]
     text: str
 
 
@@ -42,37 +49,59 @@ def sanitize_description(desc: str) -> str:
     return re.sub(r"\s+", " ", desc).strip()
 
 
-def summarize_intent(desc: str, fallback: str = "General purpose server.") -> str:
+def summarize_intent(desc: str, fallback: str = "General purpose tool.") -> str:
     if not desc:
         return fallback
     head = re.split(r"(?<=[.!?])\s+", desc, maxsplit=1)[0] or desc
     return head[:200].strip()
 
 
-def build_server_chunks(catalog_json: dict[str, Any]) -> list[ServerChunk]:
-    chunks: list[ServerChunk] = []
-    for srv in (catalog_json or {}).values():
-        server_id = str(srv.get("server_id", "")).strip()
-        server_name = (srv.get("name") or srv.get("server_name") or "").strip() or "Unknown server"
-        child_link = (srv.get("child_link") or "").strip()
-        raw_desc = (srv.get("description") or "").strip()
-        clean_desc = sanitize_description(raw_desc)
-        intent = summarize_intent(clean_desc)
+def build_tool_centric_chunks(catalog_json: dict[str, Any]) -> list[ToolChunk]:
+    chunks: list[ToolChunk] = []
+    for srv_key, srv in (catalog_json or {}).items():
+        server_id = str(srv.get("server_id", ""))
+        server_name = srv.get("name", srv_key)
+        child_link = srv.get("child_link", "")
+        for tool in (srv.get("tools") or []):
+            tool_name = (tool.get("name") or "").strip()
+            tool_slug = (tool.get("slug") or "").strip()
+            raw_desc = (tool.get("description") or "").strip()
+            clean_desc = sanitize_description(raw_desc)
+            intent = summarize_intent(clean_desc)
 
-        headline = f"[Server: {server_name}]"
-        body = f"Use for: {intent or 'General purpose server.'}"
-        detail = clean_desc if clean_desc else ""
-        text = "\n".join(filter(None, [headline, body, detail]))
+            params = (tool.get("parameters") or []) or []
+            required_params = [
+                (param.get("name") or "").strip()
+                for param in params
+                if param.get("required") is True
+            ]
 
-        chunks.append(
-            ServerChunk(
-                server_id=server_id,
-                server_name=server_name,
-                child_link=child_link,
-                description=clean_desc,
-                text=text,
+            def render_signature(param: dict[str, Any]) -> str:
+                name = (param.get("name") or "").strip() or "unnamed"
+                required = "required" if param.get("required") else "optional"
+                param_type = param.get("type")
+                type_str = str(param_type) if param_type is not None else "unknown"
+                return f"{name} ({type_str}, {required})"
+
+            param_sigs = ", ".join(render_signature(param) for param in params) if params else ""
+            headline = f"[Server: {server_name}] [Tool: {tool_name or tool_slug}]"
+            body = f"Use for: {intent or 'General purpose tool.'}"
+            params_line = f"Params: {param_sigs}" if param_sigs else "Params: none"
+            text = "\n".join([headline, body, params_line])
+
+            chunks.append(
+                ToolChunk(
+                    server_id=server_id,
+                    server_name=server_name,
+                    child_link=child_link,
+                    tool_name=tool_name or tool_slug,
+                    tool_slug=tool_slug,
+                    tool_desc=clean_desc,
+                    required_params=required_params,
+                    all_params=params,
+                    text=text,
+                )
             )
-        )
     return chunks
 
 
@@ -83,13 +112,16 @@ def load_json(path: str | Path) -> dict[str, Any]:
 
 def index_chunks(catalog_path: Path, persist_dir: Path) -> tuple[Chroma, int]:
     catalog = load_json(catalog_path)
-    chunks = build_server_chunks(catalog)
+    chunks = build_tool_centric_chunks(catalog)
     texts = [chunk.text for chunk in chunks]
     metadatas = [
         {
             "server_id": chunk.server_id,
             "server_name": chunk.server_name,
             "child_link": chunk.child_link,
+            "tool_slug": chunk.tool_slug,
+            "tool_name": chunk.tool_name,
+            "required_params": ", ".join(chunk.required_params) if chunk.required_params else "",
         }
         for chunk in chunks
     ]
@@ -160,7 +192,7 @@ def write_size_stamp(path: Path, size: int) -> None:
 
 def resolve_catalog_path(user_path: str | Path | None) -> Path:
     """
-    Resolve the server description JSON path. If user_path is provided (CLI/env), it must exist.
+    Resolve the catalog JSON path. If user_path is provided (CLI/env), it must exist.
     Otherwise fall back to common in-repo locations.
     """
 
@@ -174,18 +206,20 @@ def resolve_catalog_path(user_path: str | Path | None) -> Path:
         candidate = normalize(user_path)
         if candidate.exists():
             return candidate
-        raise FileNotFoundError(f"Description path not found: {candidate}")
+        raise FileNotFoundError(f"Catalog path not found: {candidate}")
 
     fallbacks = [
-        DEFAULT_DESCRIPTION_PATH,
-        DATA_DIR / "mcp_description.json",
+        DEFAULT_CATALOG_PATH,
+        DATA_DIR / "mcp_server_tools_core.json",
+        BASE_DIR / "Data" / "mcp_server_tools_core.json",
+        BASE_DIR / "Data" / "mcp_server_tools.json",
     ]
     for candidate in fallbacks:
         if candidate.exists():
             return candidate
 
     searched = ", ".join(str(p) for p in fallbacks)
-    raise FileNotFoundError(f"No description JSON found. Searched: {searched}")
+    raise FileNotFoundError(f"No catalog JSON found. Searched: {searched}")
 
 
 def ensure_api_key() -> None:
@@ -250,14 +284,17 @@ def score_and_rank_servers(
 
     def reason_for_server(items: list) -> str:
         lines: list[str] = []
-        for doc in items[:1]:
+        for doc in items[:3]:
+            metadata = doc.metadata or {}
+            tool = metadata.get("tool_name") or metadata.get("tool_slug") or "tool"
+            intent = ""
             if doc.page_content:
                 parts = doc.page_content.splitlines()
                 if len(parts) >= 2:
                     intent = parts[1].replace("Use for: ", "").strip()
-                    lines.append(intent)
+            lines.append(f"{tool}: {intent}" if intent else tool)
         summary = "; ".join(line for line in lines if line)
-        return textwrap.shorten(summary or "Relevant server.", width=300, placeholder="...")
+        return textwrap.shorten(summary or "Relevant tools available.", width=300, placeholder="...")
 
     ranked = sorted(grouped.items(), key=lambda item: item[1]["score"], reverse=True)[:top_servers]
     results: list[dict[str, Any]] = []
@@ -291,11 +328,11 @@ def search_servers(
     force_reindex: bool = False,
 ) -> list[dict[str, Any]]:
     """
-    Run a single RAG search and return ranked servers (name + description embeddings).
+    Run a single RAG search and return ranked servers.
     """
     load_dotenv()
     ensure_api_key()
-    env_catalog = os.getenv("MCP_SERVER_DESCRIPTION_PATH")
+    env_catalog = os.getenv("MCP_SERVER_CATALOG_PATH")
     resolved_catalog = resolve_catalog_path(catalog_path or env_catalog)
     vectordb = ensure_vectordb(resolved_catalog, persist_dir, force_reindex=force_reindex)
     return score_and_rank_servers(
@@ -308,18 +345,18 @@ def search_servers(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="RAG CLI for building and querying the MCP server description vector store."
+        description="RAG-only CLI for building and querying the MCP server vector store."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     ingest_parser = subparsers.add_parser(
         "ingest",
-        help="Embed server descriptions and persist the Chroma vector store.",
+        help="Chunk catalog JSON and persist the Chroma vector store.",
     )
     ingest_parser.add_argument(
         "--json",
         required=True,
-        help="Path to the server description JSON document.",
+        help="Path to the MCP server catalog JSON document.",
     )
     ingest_parser.add_argument(
         "--persist-dir",
@@ -354,7 +391,7 @@ def parse_args() -> argparse.Namespace:
         "--k-tools",
         type=int,
         default=12,
-        help="Number of description chunks to retrieve before aggregation (default: 12).",
+        help="Number of tool chunks to retrieve before aggregation (default: 12).",
     )
     search_parser.add_argument(
         "--top-servers",

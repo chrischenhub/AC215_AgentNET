@@ -27,6 +27,7 @@ logs/
 *.dump
 DB/chroma_store/
 GCB/
+src/models/GCB_description/
 
 # JavaScript dependencies
 node_modules/
