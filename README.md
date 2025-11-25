@@ -93,7 +93,3 @@ A Model Context Protocol (MCP) server that provides search and discovery capabil
 
 ## Instruction
 See README.md under AgentNet/AgentNetMCP
-
-## Work example
-![alt text](Image/mcp1.png)
-![alt text](Image/mcp2.png)
