@@ -28,11 +28,14 @@ Interface running sample:
 
 ## Data Versioning
 ### Current Data Versioning Summary
-Run to get a summary and history of data versioning
+Run to generate a summary and history of data versioning in a text file
 ```
 python docs/summarize_data_versions.py
 ```
 ![DVC overview](../Image/dvc.png)
+
+Github Tags:
+![DVC overview](../Image/gittag.png)
 
 ### Logic and workflow
 - We track the dataset under `src/models/data_mcpinfo` with DVC; git stores only the small `.dvc` pointer while the actual data lives in the remote bucket.
@@ -43,7 +46,8 @@ python docs/summarize_data_versions.py
 ### Setup and adding a new version
 1) Run `docker-shell.sh`  
    - From the repo root, start the dev shell that has DVC installed:  
-     `sh docker-shell.sh`
+   - On Mac: `sh docker-shell.sh`
+   - On Windows: `bash docker-shell.sh`
 
 2) Initialize DVC (only if starting fresh)  
    - `dvc init`
@@ -65,6 +69,7 @@ python docs/summarize_data_versions.py
    - `git add src/models/data_mcpinfo.dvc .dvc/config`  
    - `git commit -m "Update data_mcpinfo vN"`  
    - Optional dataset tag: `git tag -a dataset_vN -m "tag dataset"`  
+   - Add a remote origin `git remote add origin git@github.com:chrischenhub/AgentNet.git` Replace with your username and repo name
    - Push code and tag together: `git push --atomic origin main dataset_vN`
 
 ## CI / Testing
@@ -74,3 +79,11 @@ python docs/summarize_data_versions.py
 - GitHub Actions runs the same steps on every push/PR via `.github/workflows/ci.yml` (checkout -> install deps -> byte-compile -> lint -> pytest with coverage).
 - CI/CD running example:  
 ![alt text](../Image/CICD.png)
+
+## MCP 
+In this milesonte, we changed the websrapping code in `src/datapipline` folder to fit the new html structure in the MCP link website and make sure the webscrapping still works. 
+
+We collected 20+ more new MCPs including the MCP for some google apps like gmail, google map, google dock, etc
+
+## RAG Chunking Strategy Update
+Legacy chunking in `RAG_legacy.py` embedded one chunk per tool (name/slug/params), so as MCP coverage grew and tool counts exploded the vector store ballooned and searches had to scan thousands of vectors. The new `RAG.py` collapses to one chunk per server with a `[Server: name] headline plus a concise “Use for” intent from the description`, avoiding tool-level explosion while keeping child_link for routing. That trims embeddings to roughly one chunk per MCP, so similarity search and scoring run over far fewer vectors. Ranking now needs only a small k_tools to pick top servers instead of sifting through every tool. With more MCPs onboarded the old tool-centric search was taking ~2 minutes to return results; the server-level chunking brings latency back to interactive speed.

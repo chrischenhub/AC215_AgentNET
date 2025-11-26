@@ -1,4 +1,6 @@
 # AgentNet RAG search + MCP Execution
+## Milestone 4 Update
+Referring to `docs/milestone4.md` for the documentation on milestone 4
 ## Quickstart
 
 0. Go to src/models
@@ -38,14 +40,7 @@
    docker compose -f src/models/docker-compose.yml up
    ```
    And visit http://localhost:8000 
-## Front End (under models/static)
-
-1. Built as a lightweight FastAPI site (`app.py`) that serves templates/index.html plus the static bundle in `static/app.js` and `static/styles.css`.
-
-2. `app.js` drives the UX: it posts to `/api/search` to fetch RAG-ranked MCP servers, renders them as selectable cards, and calls `/api/execute` to run the Notion agent against the chosen server.
-
-3. `styles.css` supplies the glassmorphism look-and-feel, responsive layout, and accessibility-centric focus states.
-
+## Front End (under models/static)states.
 Interface:
 ![alt text](Image/frontend.png)
 
@@ -96,7 +91,3 @@ A Model Context Protocol (MCP) server that provides search and discovery capabil
 
 ## Instruction
 See README.md under AgentNet/AgentNetMCP
-
-## Work example
-![alt text](Image/mcp1.png)
-![alt text](Image/mcp2.png)
