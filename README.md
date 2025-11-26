@@ -28,15 +28,16 @@
    docker compose -f src/models/docker-compose.yml up --build
    ```
 
-5. Execute the workflow RAG search + MCP
-    ```
-    docker compose exec agentnet python main.py "What do you want to do"
-    ```
-
-6. Only Initiate the Docker image, but not the webapp
+5. Only Initiate the Docker image, but not the webapp
    ```
    docker compose -f src/models/docker-compose.yml run --rm agentnet /bin/bash
    ```
+
+6. Directly start the webapp with Docker
+   ```
+   docker compose -f src/models/docker-compose.yml up
+   ```
+   And visit http://localhost:8000 
 ## Front End (under models/static)
 
 1. Built as a lightweight FastAPI site (`app.py`) that serves templates/index.html plus the static bundle in `static/app.js` and `static/styles.css`.
@@ -44,9 +45,6 @@
 2. `app.js` drives the UX: it posts to `/api/search` to fetch RAG-ranked MCP servers, renders them as selectable cards, and calls `/api/execute` to run the Notion agent against the chosen server.
 
 3. `styles.css` supplies the glassmorphism look-and-feel, responsive layout, and accessibility-centric focus states.
-
-4. Launch locally with `docker compose -f src/models/docker-compose.yml up` (or uvicorn app:create_app --reload inside the container) and visit http://localhost:8000 to use the browser client.
-
 
 Interface:
 ![alt text](Image/frontend.png)
@@ -61,7 +59,11 @@ Interface:
 
 `mcp_to_json.py`: convert `Data/mcp_server_tools.csv` into a canonical agents.json (serialize rows into the expected JSON schema / `mcp` array or top-level `agent` objects), validate required fields, and write `Data/mcp_server_tools.json`
 
-`RAG.py`: load agents.json, chunk content **by tool** (one chunk per tool including tool_name, tool_description, parameters, plus agent metadata), compute embeddings for each chunk, add texts+metadata to a Chroma collection persisted at DB/chroma_store, call persist(), and upload the DB/chroma_store directory to the configured Google Cloud Storage bucket
+`mcp_description_csv_to_json.py`: Converts the server CSV `(id/name/child_link/description)` to JSON for RAG. It keeps
+  provided numeric IDs or auto-increments, keys entries by child_link/name (first wins), and writes pretty JSON.
+  Defaults: input `src/models/Data/mcp_description.csv`, output `src/models/Data/mcp_description.json`.
+
+`RAG.py`:  CLI to build/query a Chroma store of those descriptions. ingest embeds and persists under `src/models/GCB`, reindexing when source size changes; search loads/repairs, runs similarity search, and ranks servers by weighted retrieval score with child links. Chunking: exactly one chunk per server—cleaned HTML/whitespace, an intent sentence from the first description sentence (200-char cap), formatted as `[Server: name], Use for: intent`, then full cleaned description.
 
 ## RAG -> MCP workflow (Ex. Notion)
 1. `main.py`: User enter a question.For example, "I want to create a  "I want to create a SQL study plan using a notetaking tool."
