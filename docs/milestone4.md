@@ -85,5 +85,6 @@ In this milestone, we changed the webscraping code in `src/datapipline` folder t
 
 We collected 20+ more new MCPs, including the MCP for Google Apps such as Gmail, Google Maps, Google Dock, etc
 
+Now, AgentNet supports, Notion, Gmail, Microsoft Learn, Google Caldendar, Google Tasks.
 ## RAG Chunking Strategy Update
 Legacy chunking in `RAG_legacy.py` embedded one chunk per tool (name/slug/params), so as MCP coverage grew and tool counts exploded the vector store ballooned and searches had to scan thousands of vectors. The new `RAG.py` collapses to one chunk per server with a `[Server: name] headline plus a concise “Use for” intent from the description`, avoiding tool-level explosion while keeping child_link for routing. That trims embeddings to roughly one chunk per MCP, so similarity search and scoring run over far fewer vectors. Ranking now needs only a small k_tools to pick top servers instead of sifting through every tool. With more MCPs onboarded the old tool-centric search was taking ~2 minutes to return results; the server-level chunking brings latency back to interactive speed.
