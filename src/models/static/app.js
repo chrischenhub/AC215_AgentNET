@@ -8,6 +8,7 @@ const agentPanel = document.getElementById("agent-panel");
 const agentOutput = document.getElementById("agent-output");
 const agentRaw = document.getElementById("agent-raw");
 const statusBar = document.getElementById("status-bar");
+const resetButton = document.getElementById("reset-chat");
 
 let currentInstruction = "";
 let currentResults = [];
@@ -36,6 +37,19 @@ const clearPanels = () => {
   agentOutput.classList.add("empty");
   agentRaw.textContent = "No agent run yet.";
   activeIndex = -1;
+};
+
+const resetChatContext = () => {
+  conversation.innerHTML = "";
+  conversationHistory = [];
+  currentResults = [];
+  selectedServer = null;
+  serverLocked = false;
+  currentInstruction = "";
+  clearPanels();
+  showStatus("Chat cleared. Ask a new question.");
+  form.reset();
+  input.focus();
 };
 
 const setBusy = (state) => {
@@ -352,4 +366,12 @@ submitButton.addEventListener("keydown", (event) => {
     event.preventDefault();
     submitButton.click();
   }
+});
+
+resetButton.addEventListener("click", () => {
+  if (isBusy) {
+    showStatus("Please wait for the current run to finish before starting over.", "error");
+    return;
+  }
+  resetChatContext();
 });

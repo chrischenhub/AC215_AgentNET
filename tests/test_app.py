@@ -78,3 +78,36 @@ def test_agent_selection_locks_results_panel() -> None:
     agent_call = script.index("await runAgentWithServer", hide_call)
 
     assert lock_assignment < hide_call < agent_call, "Results panel should be hidden once a server is locked in."
+
+
+def test_reset_chat_clears_state_and_notifies() -> None:
+    script = Path("src/models/static/app.js").read_text()
+    reset_fn = script.index("const resetChatContext = () => {")
+    clear_conversation = script.index('conversation.innerHTML = "";', reset_fn)
+    clear_history = script.index("conversationHistory = [];", clear_conversation)
+    clear_results = script.index("currentResults = [];", clear_history)
+    reset_server = script.index("selectedServer = null;", clear_results)
+    unlock_server = script.index("serverLocked = false;", reset_server)
+    show_status = script.index('showStatus("Chat cleared. Ask a new question.");', unlock_server)
+
+    assert (
+        clear_conversation
+        < clear_history
+        < clear_results
+        < reset_server
+        < unlock_server
+        < show_status
+    ), "Reset should clear UI/state before notifying the user."
+
+
+def test_reset_button_waits_if_busy() -> None:
+    script = Path("src/models/static/app.js").read_text()
+    handler = script.index('resetButton.addEventListener("click"', script.index("const resetChatContext"))
+    busy_guard = script.index("if (isBusy)", handler)
+    warn_status = script.index(
+        'showStatus("Please wait for the current run to finish before starting over.", "error");', busy_guard
+    )
+    return_stmt = script.index("return;", warn_status)
+    call_reset = script.index("resetChatContext();", return_stmt)
+
+    assert busy_guard < warn_status < return_stmt < call_reset, "Reset should warn and exit when a run is in progress."
