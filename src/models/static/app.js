@@ -13,6 +13,8 @@ let currentInstruction = "";
 let currentResults = [];
 let activeIndex = -1;
 let isBusy = false;
+let conversationHistory = [];
+let selectedServer = null;
 
 const scrollConversationToBottom = () => {
   conversation.scrollTo({
@@ -68,6 +70,14 @@ const appendMessage = (role, text, subtitle = "") => {
   wrapper.appendChild(body);
   conversation.appendChild(wrapper);
   scrollConversationToBottom();
+
+  if (role === "user" || role === "agent" || role === "assistant") {
+    const normalizedRole = role === "agent" ? "assistant" : role;
+    conversationHistory.push({ role: normalizedRole, content: text });
+    if (conversationHistory.length > 20) {
+      conversationHistory = conversationHistory.slice(-20);
+    }
+  }
 };
 
 const updateActiveResultHighlight = () => {
@@ -134,7 +144,12 @@ const renderResults = (results) => {
         return;
       }
       setBusy(true);
-      showStatus(`Running AgentNet through ${item.server || "selected server"}...`);
+      const label = item.server || "selected server";
+      if (item.mode === "direct") {
+        showStatus("Answering directly (no MCP tools)...");
+      } else {
+        showStatus(`Running AgentNet through ${label}...`);
+      }
       try {
         await runAgentWithIndex(index);
       } catch (error) {
@@ -229,11 +244,23 @@ const runAgentWithIndex = async (index) => {
 
   activeIndex = index;
   updateActiveResultHighlight();
+  selectedServer = server;
+
+  await runAgentWithServer(server, currentInstruction);
+};
+
+const runAgentWithServer = async (server, instruction) => {
+  if (!server) {
+    throw new Error("No server selected.");
+  }
+  currentInstruction = instruction;
 
   const payload = await fetchJSON("/api/execute", {
-    notion_instruction: currentInstruction,
+    notion_instruction: instruction,
     child_link: server.child_link,
     server_name: server.server,
+    mode: server.mode,
+    history: conversationHistory,
   });
 
   appendMessage(
@@ -253,6 +280,26 @@ form.addEventListener("submit", async (event) => {
 
   const query = input.value.trim();
   if (!query) {
+    return;
+  }
+
+  // Clear the input immediately so the typed message moves to the chat list right away.
+  form.reset();
+
+  // If a server is already selected, reuse it and skip new RAG search.
+  if (selectedServer) {
+    appendMessage("user", query, "You");
+    showStatus(`Running AgentNet through ${selectedServer.server || "selected server"}...`);
+    setBusy(true);
+    try {
+      await runAgentWithServer(selectedServer, query);
+      showStatus("Agent run completed.", "success");
+    } catch (error) {
+      showStatus(error.message || "Agent run failed.", "error");
+    } finally {
+      setBusy(false);
+      form.reset();
+    }
     return;
   }
 

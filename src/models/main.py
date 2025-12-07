@@ -6,10 +6,12 @@ from typing import Any
 
 from RAG import PERSIST_DIR as DEFAULT_PERSIST_DIR
 from workflow import (
+    DIRECT_MODE,
     DEFAULT_K_TOOLS,
     DEFAULT_TOP_SERVERS,
+    add_direct_answer_option,
     derive_mcp_url,
-    execute_mcp_workflow,
+    execute_agent_workflow,
     rag_search,
 )
 
@@ -42,13 +44,15 @@ def prompt_for_selection(results: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 async def run_workflow(args: argparse.Namespace) -> None:
-    results = rag_search(
-        args.query,
-        catalog_path=args.catalog,
-        top_servers=args.top_servers,
-        k_tools=args.k_tools,
-        force_reindex=args.reindex,
-        persist_dir=args.persist_dir,
+    results = add_direct_answer_option(
+        rag_search(
+            args.query,
+            catalog_path=args.catalog,
+            top_servers=args.top_servers,
+            k_tools=args.k_tools,
+            force_reindex=args.reindex,
+            persist_dir=args.persist_dir,
+        )
     )
     if not results:
         print("No matching servers found.")
@@ -63,19 +67,29 @@ async def run_workflow(args: argparse.Namespace) -> None:
     child_link = chosen.get("child_link", "")
     notion_instruction = args.notion_instruction or args.query
 
-    try:
-        mcp_url = derive_mcp_url(child_link)
-    except ValueError as exc:
-        print(f"Unable to derive MCP URL: {exc}")
-        return
-    print(f"\nUsing server '{server_name}' with MCP endpoint: {mcp_url}")
+    if chosen.get("mode") == DIRECT_MODE or not child_link:
+        print("\nUsing direct answer mode (no MCP tools).")
+        envelope = await execute_agent_workflow(
+            notion_instruction=notion_instruction,
+            child_link=None,
+            server_name=server_name,
+            include_raw_payload=False,
+            mode=DIRECT_MODE,
+        )
+    else:
+        try:
+            mcp_url = derive_mcp_url(child_link)
+        except ValueError as exc:
+            print(f"Unable to derive MCP URL: {exc}")
+            return
+        print(f"\nUsing server '{server_name}' with MCP endpoint: {mcp_url}")
 
-    envelope = await execute_mcp_workflow(
-        notion_instruction=notion_instruction,
-        child_link=child_link,
-        server_name=server_name,
-        include_raw_payload=False,
-    )
+        envelope = await execute_agent_workflow(
+            notion_instruction=notion_instruction,
+            child_link=child_link,
+            server_name=server_name,
+            include_raw_payload=False,
+        )
     final_output = envelope.final_output
 
     print("\n=== Agent Output ===\n")

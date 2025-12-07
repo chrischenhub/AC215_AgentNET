@@ -15,8 +15,9 @@ from workflow import (
     DEFAULT_PERSIST_DIR,
     DEFAULT_TOP_SERVERS,
     AgentRunEnvelope,
+    add_direct_answer_option,
     async_rag_search,
-    execute_mcp_workflow,
+    execute_agent_workflow,
 )
 
 
@@ -61,7 +62,10 @@ class SearchPayload(BaseModel):
 
 class ExecutePayload(BaseModel):
     notion_instruction: str = Field(..., description="Instruction to send to the AgentNet.")
-    child_link: str = Field(..., description="MCP child link for the selected server.")
+    child_link: str | None = Field(
+        None,
+        description="MCP child link for the selected server.",
+    )
     server_name: str | None = Field(
         None,
         description="Display name of the selected server (used for contextual prompts).",
@@ -73,6 +77,14 @@ class ExecutePayload(BaseModel):
     notion_mcp_base_url_override: str | None = Field(
         None,
         description="Direct override of the MCP base URL (advanced).",
+    )
+    mode: str | None = Field(
+        None,
+        description="Optional execution mode. Use 'direct' to skip MCP tools.",
+    )
+    history: list[dict[str, str]] | None = Field(
+        None,
+        description="Recent conversation turns to provide short-term memory.",
     )
 
 
@@ -92,13 +104,15 @@ async def index(request: Request) -> HTMLResponse:
 @app.post("/api/search")
 async def api_search(payload: SearchPayload) -> dict[str, Any]:
     try:
-        results = await async_rag_search(
-            payload.query,
-            persist_dir=payload.persist_dir,
-            catalog_path=payload.catalog,
-            top_servers=payload.top_servers,
-            k_tools=payload.k_tools,
-            force_reindex=payload.reindex,
+        results = add_direct_answer_option(
+            await async_rag_search(
+                payload.query,
+                persist_dir=payload.persist_dir,
+                catalog_path=payload.catalog,
+                top_servers=payload.top_servers,
+                k_tools=payload.k_tools,
+                force_reindex=payload.reindex,
+            )
         )
     except Exception as exc:  # pragma: no cover - surfaced back to UI
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -112,13 +126,15 @@ async def api_search(payload: SearchPayload) -> dict[str, Any]:
 @app.post("/api/execute")
 async def api_execute(payload: ExecutePayload) -> dict[str, Any]:
     try:
-        envelope = await execute_mcp_workflow(
+        envelope = await execute_agent_workflow(
             notion_instruction=payload.notion_instruction,
             child_link=payload.child_link,
             server_name=payload.server_name,
             clarified_instruction=payload.clarified_instruction,
             notion_mcp_base_url_override=payload.notion_mcp_base_url_override,
             include_raw_payload=True,
+            mode=payload.mode,
+            history=payload.history,
         )
     except Exception as exc:  # pragma: no cover - surfaced back to UI
         raise HTTPException(status_code=500, detail=str(exc)) from exc

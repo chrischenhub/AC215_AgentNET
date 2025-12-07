@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
+from pathlib import Path
 
 import app
 from workflow import AgentRunEnvelope
@@ -48,3 +49,11 @@ def test_api_execute_returns_envelope(monkeypatch: pytest.MonkeyPatch) -> None:
     body = response.json()
     assert body["final_output"] == "ok"
     assert body["raw_output"]["details"] is True
+
+
+def test_frontend_resets_form_before_running() -> None:
+    script = Path("src/models/static/app.js").read_text()
+    submit_handler = script.index('form.addEventListener("submit"')
+    reset_call = script.index("form.reset();", submit_handler)
+    selected_server_branch = script.index("if (selectedServer)", submit_handler)
+    assert reset_call < selected_server_branch, "User input should clear before handling submission paths."

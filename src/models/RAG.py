@@ -17,7 +17,7 @@ from langchain_openai import OpenAIEmbeddings
 # Paths are rooted relative to this file so the service works regardless of CWD.
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data_mcpinfo"
-DEFAULT_DESCRIPTION_PATH = DATA_DIR / "mcp_description.jsonn"
+DEFAULT_DESCRIPTION_PATH = DATA_DIR / "mcp_description.json"
 DESCRIPTION_CANDIDATES = [
     DEFAULT_DESCRIPTION_PATH,
     DATA_DIR / "mcp_description.json",
