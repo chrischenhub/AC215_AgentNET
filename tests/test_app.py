@@ -57,3 +57,24 @@ def test_frontend_resets_form_before_running() -> None:
     reset_call = script.index("form.reset();", submit_handler)
     selected_server_branch = script.index("if (selectedServer)", submit_handler)
     assert reset_call < selected_server_branch, "User input should clear before handling submission paths."
+
+
+def test_render_results_hides_when_locked() -> None:
+    script = Path("src/models/static/app.js").read_text()
+    render_fn = script.index("const renderResults = (results) => {")
+    guard = script.index("if (serverLocked)", render_fn)
+    hide_call = script.index("hideResultsPanel();", guard)
+    early_return = script.index("return;", hide_call)
+    first_results_usage = script.index("resultsList.innerHTML", render_fn)
+
+    assert guard < hide_call < early_return < first_results_usage, "Guard should hide and return before mutating results."
+
+
+def test_agent_selection_locks_results_panel() -> None:
+    script = Path("src/models/static/app.js").read_text()
+    run_with_index = script.index("const runAgentWithIndex = async (index) => {")
+    lock_assignment = script.index("serverLocked = true;", run_with_index)
+    hide_call = script.index("hideResultsPanel();", lock_assignment)
+    agent_call = script.index("await runAgentWithServer", hide_call)
+
+    assert lock_assignment < hide_call < agent_call, "Results panel should be hidden once a server is locked in."

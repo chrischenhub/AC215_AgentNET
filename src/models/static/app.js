@@ -15,6 +15,12 @@ let activeIndex = -1;
 let isBusy = false;
 let conversationHistory = [];
 let selectedServer = null;
+let serverLocked = false;
+
+const hideResultsPanel = () => {
+  resultsList.innerHTML = "";
+  resultsPanel.classList.add("hidden");
+};
 
 const scrollConversationToBottom = () => {
   conversation.scrollTo({
@@ -24,8 +30,7 @@ const scrollConversationToBottom = () => {
 };
 
 const clearPanels = () => {
-  resultsList.innerHTML = "";
-  resultsPanel.classList.add("hidden");
+  hideResultsPanel();
   agentPanel.classList.add("hidden");
   agentOutput.textContent = "";
   agentOutput.classList.add("empty");
@@ -100,9 +105,14 @@ const formatScore = (score) => {
 };
 
 const renderResults = (results) => {
+  if (serverLocked) {
+    hideResultsPanel();
+    return;
+  }
+
   resultsList.innerHTML = "";
   if (!Array.isArray(results) || results.length === 0) {
-    resultsPanel.classList.add("hidden");
+    hideResultsPanel();
     return;
   }
 
@@ -245,6 +255,8 @@ const runAgentWithIndex = async (index) => {
   activeIndex = index;
   updateActiveResultHighlight();
   selectedServer = server;
+  serverLocked = true;
+  hideResultsPanel();
 
   await runAgentWithServer(server, currentInstruction);
 };
@@ -288,6 +300,7 @@ form.addEventListener("submit", async (event) => {
 
   // If a server is already selected, reuse it and skip new RAG search.
   if (selectedServer) {
+    hideResultsPanel();
     appendMessage("user", query, "You");
     showStatus(`Running AgentNet through ${selectedServer.server || "selected server"}...`);
     setBusy(true);
