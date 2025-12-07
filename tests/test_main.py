@@ -51,14 +51,14 @@ async def test_run_workflow_prints_agent_output(monkeypatch: pytest.MonkeyPatch,
     )
     monkeypatch.setattr(main, "prompt_for_selection", lambda results: results[0])
 
-    async def fake_execute_mcp_workflow(**kwargs):
+    async def fake_execute_agent_workflow(**kwargs):
         return AgentRunEnvelope(
             mcp_base_url="https://server.smithery.ai/demo/mcp",
             final_output="Agent result",
             raw_output=None,
         )
 
-    monkeypatch.setattr(main, "execute_mcp_workflow", fake_execute_mcp_workflow)
+    monkeypatch.setattr(main, "execute_agent_workflow", fake_execute_agent_workflow)
 
     await main.run_workflow(args)
     output = capsys.readouterr().out

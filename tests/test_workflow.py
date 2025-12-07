@@ -39,7 +39,9 @@ async def test_async_rag_search_delegates(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(workflow, "rag_search", lambda *_, **__: expected)
 
     result = await workflow.async_rag_search("query")
-    assert result == expected
+    assert expected[0] in result
+    # direct answer option should be appended
+    assert any(item.get("mode") == workflow.DIRECT_MODE for item in result)
 
 
 @pytest.mark.asyncio

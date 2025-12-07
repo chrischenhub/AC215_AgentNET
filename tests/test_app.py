@@ -34,14 +34,14 @@ def test_api_search_returns_results(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_api_execute_returns_envelope(monkeypatch: pytest.MonkeyPatch) -> None:
     client = TestClient(app.app)
 
-    async def fake_execute_mcp_workflow(**kwargs):
+    async def fake_execute_agent_workflow(**kwargs):
         return AgentRunEnvelope(
             mcp_base_url="https://example.com/mcp",
             final_output="ok",
             raw_output={"details": True},
         )
 
-    monkeypatch.setattr(app, "execute_mcp_workflow", fake_execute_mcp_workflow)
+    monkeypatch.setattr(app, "execute_agent_workflow", fake_execute_agent_workflow)
 
     payload = {"notion_instruction": "do it", "child_link": "/server/demo", "server_name": "Demo"}
     response = client.post("/api/execute", json=payload)
