@@ -13,7 +13,7 @@ from notion_agent import run_smithery_task
 DEFAULT_TOP_SERVERS = 5
 DEFAULT_K_TOOLS = 12
 DIRECT_MODE = "direct"
-DIRECT_OPTION_LABEL = "No MCP needed (direct answer)"
+DIRECT_OPTION_LABEL = "Direct Answer"
 
 
 @dataclass

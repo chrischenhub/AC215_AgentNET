@@ -4,9 +4,7 @@ const submitButton = document.getElementById("submit-button");
 const conversation = document.getElementById("conversation");
 const resultsPanel = document.getElementById("results-panel");
 const resultsList = document.getElementById("results-list");
-const agentPanel = document.getElementById("agent-panel");
-const agentOutput = document.getElementById("agent-output");
-const agentRaw = document.getElementById("agent-raw");
+
 const statusBar = document.getElementById("status-bar");
 const resetButton = document.getElementById("reset-chat");
 
@@ -32,10 +30,6 @@ const scrollConversationToBottom = () => {
 
 const clearPanels = () => {
   hideResultsPanel();
-  agentPanel.classList.add("hidden");
-  agentOutput.textContent = "";
-  agentOutput.classList.add("empty");
-  agentRaw.textContent = "No agent run yet.";
   activeIndex = -1;
 };
 
@@ -77,12 +71,22 @@ const appendMessage = (role, text, subtitle = "") => {
   const wrapper = document.createElement("div");
   wrapper.className = `message ${role}`;
 
+  const header = document.createElement("div");
+  header.className = "message-header";
+
   if (subtitle) {
-    const label = document.createElement("div");
+    const label = document.createElement("span");
     label.className = "message-label";
     label.textContent = subtitle;
-    wrapper.appendChild(label);
+    header.appendChild(label);
   }
+
+  const time = document.createElement("span");
+  time.className = "message-time";
+  const now = new Date();
+  time.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  header.appendChild(time);
+  wrapper.appendChild(header);
 
   const body = document.createElement("div");
   body.textContent = text;
@@ -189,53 +193,6 @@ const renderResults = (results) => {
   updateActiveResultHighlight();
 };
 
-const setAgentDetails = (payload, server) => {
-  agentPanel.classList.remove("hidden");
-
-  agentOutput.innerHTML = "";
-  agentOutput.classList.remove("empty");
-
-  const meta = document.createElement("div");
-  meta.className = "agent-meta";
-
-  const nameSpan = document.createElement("span");
-  nameSpan.className = "meta-primary";
-  nameSpan.textContent = server.server || "Unknown server";
-  meta.appendChild(nameSpan);
-
-  if (payload.mcp_base_url) {
-    const urlSpan = document.createElement("span");
-    urlSpan.className = "meta-secondary";
-    urlSpan.textContent = payload.mcp_base_url;
-    meta.appendChild(urlSpan);
-  }
-
-  const instructionSpan = document.createElement("span");
-  instructionSpan.className = "meta-secondary";
-  instructionSpan.textContent = `Instruction: ${currentInstruction}`;
-  meta.appendChild(instructionSpan);
-
-  const outputParagraph = document.createElement("p");
-  const finalText = safeText(payload.final_output).trim();
-  outputParagraph.textContent = finalText || "Agent returned no output.";
-
-  if (!finalText) {
-    agentOutput.classList.add("empty");
-  }
-
-  agentOutput.append(meta, outputParagraph);
-
-  if (payload.raw_output === null || payload.raw_output === undefined) {
-    agentRaw.textContent = "No additional payload returned.";
-  } else {
-    try {
-      agentRaw.textContent = JSON.stringify(payload.raw_output, null, 2);
-    } catch (error) {
-      agentRaw.textContent = safeText(payload.raw_output);
-    }
-  }
-};
-
 const fetchJSON = async (url, body) => {
   const response = await fetch(url, {
     method: "POST",
@@ -294,7 +251,7 @@ const runAgentWithServer = async (server, instruction) => {
     safeText(payload.final_output).trim() || "Agent returned no output.",
     `AgentNet • ${server.server || "selected server"}`
   );
-  setAgentDetails(payload, server);
+  // setAgentDetails(payload, server); // Panel removed
   showStatus("Agent run completed.", "success");
 };
 

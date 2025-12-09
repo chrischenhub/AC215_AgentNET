@@ -4,41 +4,53 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AgentNet</title>
+    <title>AgentNet (Liquid Glass Preview)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=liquidglass_v11">
+    <link rel="stylesheet" href="../static/styles.css?v=liquidglass_v11">
+    <style>
+        .panel.hidden {
+            display: flex !important;
+            opacity: 1;
+        }
+    </style>
 </head>
 
 <body>
     <div id="background"></div>
     <div id="app">
         <header class="hero">
-            <!-- <div class="sparkles" aria-hidden="true">&lt;SYSTEM_READY&gt;</div> -->
-            <h1>AGENTNET</h1>
-            <!-- <p class="tagline">INITIALIZING NEURAL LINK... [OK]</p> -->
+            <div class="sparkles" aria-hidden="true">&lt;SYSTEM_READY&gt;</div>
+            <h1>AGENT.NET</h1>
+            <p class="tagline">INITIALIZING NEURAL LINK... [OK]</p>
         </header>
 
         <main class="content">
             <section id="conversation" aria-live="polite" aria-label="Conversation history">
-                <!-- Messages will be injected here -->
+                <div class="message user">
+                    <div class="message-header">
+                        <span class="message-label">USER_01</span>
+                        <span class="message-time">10:42 PM</span>
+                    </div>
+                    <div>Initiate refined UI protocol. Testing mixed Case support.</div>
+                </div>
+                <div class="message agent">
+                    <div class="message-header">
+                        <span class="message-label">AGENT_NET</span>
+                        <span class="message-time">10:42 PM</span>
+                    </div>
+                    <div>Affirmative. Panel removed. Timestamps active. Capitalization unlocked.</div>
+                </div>
             </section>
 
-            <section id="results-panel" class="panel hidden" aria-label="RAG search results">
-                <header class="panel-header">
-                    <h2>&gt; SELECT MCP Servers</h2>
-                    <p>AVAILABLE MCP DETECTED:</p>
-                </header>
-                <div id="results-list" class="results-list"></div>
-            </section>
-
+            <!-- Agent Panel Removed -->
         </main>
 
         <footer class="controls">
             <form id="query-form" class="input-row" autocomplete="off">
                 <span class="prompt-char">&gt;</span>
-                <input id="query-input" name="query" type="text" placeholder=" How can I help you?"
+                <input id="query-input" name="query" type="text" placeholder="Enter command..."
                     aria-label="Ask AgentNet" required>
                 <button id="submit-button" type="submit" class="send-button" aria-label="Send prompt">
                 </button>
@@ -47,13 +59,11 @@
             <div class="actions-row">
                 <div id="status-bar" role="status" aria-live="polite"></div>
                 <button id="reset-chat" type="button" class="reset-button" aria-label="Start a new chat">
-                    Reset Chat
+                    [ RESET_SYSTEM ]
                 </button>
             </div>
         </footer>
     </div>
-
-    <script src="{{ url_for('static', path='app.js') }}" defer></script>
 </body>
 
 </html>
