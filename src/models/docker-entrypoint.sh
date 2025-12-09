@@ -122,9 +122,29 @@ maybe_pip_install
 [[ -z "${OPENAI_API_KEY:-}" ]] && log "WARN: OPENAI_API_KEY is not set."
 [[ -z "${SMITHERY_API_KEY:-}" ]] && log "WARN: SMITHERY_API_KEY is not set."
 
-# --- Default command -------------------------------------------------------
-if [[ "$#" -eq 0 ]]; then
-  set -- /bin/bash
-fi
+# --- Server functions -------------------------------------------------------
+uvicorn_server() {
+    cd "$APP_DIR"
+    uvicorn app:app --host 0.0.0.0 --port "${PORT:-8000}" --log-level debug --reload --reload-dir . "$@"
+}
 
-exec "$@"
+uvicorn_server_production() {
+    cd "$APP_DIR"
+    uvicorn app:app --host 0.0.0.0 --port "${PORT:-8000}" --lifespan on
+}
+
+export -f uvicorn_server
+export -f uvicorn_server_production
+
+log "Available commands: uvicorn_server, uvicorn_server_production"
+
+# --- Run mode ---------------------------------------------------------------
+if [ "${DEV:-0}" = "1" ]; then
+    # Development mode: Keep shell open for interactive use
+    log "Starting in DEVELOPMENT mode (interactive shell)"
+    exec /bin/bash
+else
+    # Production mode: Run server in the foreground
+    log "Starting in PRODUCTION mode (uvicorn server)"
+    uvicorn_server_production
+fi

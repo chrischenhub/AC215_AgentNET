@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
+import shutil
 import textwrap
 from collections import defaultdict
 from dataclasses import dataclass
@@ -24,7 +26,7 @@ DESCRIPTION_CANDIDATES = [
     BASE_DIR / "Data" / "mcp_description.json",
 ]
 PERSIST_DIR = BASE_DIR / "GCB"
-CATALOG_SIZE_STAMP = PERSIST_DIR / ".catalog_size"
+CATALOG_HASH_STAMP = PERSIST_DIR / ".catalog_hash"
 
 COLLECTION_NAME = "servers_v1"
 EMBED_MODEL = "text-embedding-3-large"
@@ -86,7 +88,35 @@ def load_json(path: str | Path) -> dict[str, Any]:
         return json.load(handle)
 
 
+def clear_persist_dir(persist_dir: Path) -> None:
+    """
+    Clear all files in the persist directory (GCB folder) before recreating embeddings.
+    This ensures a clean state - the folder is completely overwritten rather than
+    accumulating old embedding files.
+    """
+    if not persist_dir.exists():
+        return
+
+    for item in persist_dir.iterdir():
+        try:
+            if item.is_file():
+                item.unlink()
+            elif item.is_dir():
+                shutil.rmtree(item)
+        except Exception:
+            # Continue even if some files can't be deleted (e.g., permission issues)
+            pass
+
+
 def index_chunks(catalog_path: Path, persist_dir: Path) -> tuple[Chroma, int]:
+    """
+    Create embeddings for the catalog. This function:
+    1. Clears all existing files in persist_dir (GCB folder) for a clean slate
+    2. Creates fresh embeddings from the catalog
+
+    When the GCB folder is mounted from Google Cloud Bucket, this ensures
+    the entire folder is overwritten (not just new files added).
+    """
     catalog = load_json(catalog_path)
     chunks = build_server_chunks(catalog)
     texts = [chunk.text for chunk in chunks]
@@ -99,15 +129,11 @@ def index_chunks(catalog_path: Path, persist_dir: Path) -> tuple[Chroma, int]:
         for chunk in chunks
     ]
 
-    try:
-        existing = Chroma(
-            collection_name=COLLECTION_NAME,
-            persist_directory=str(persist_dir),
-            embedding_function=OpenAIEmbeddings(model=EMBED_MODEL),
-        )
-        existing.delete_collection()
-    except Exception:
-        pass
+    # Clear all existing files in the persist directory for a clean overwrite
+    clear_persist_dir(persist_dir)
+
+    # Recreate the directory after clearing
+    persist_dir.mkdir(parents=True, exist_ok=True)
 
     embeddings = OpenAIEmbeddings(model=EMBED_MODEL)
     vectordb = Chroma(
@@ -126,20 +152,6 @@ def index_chunks(catalog_path: Path, persist_dir: Path) -> tuple[Chroma, int]:
     return vectordb, len(texts)
 
 
-def chroma_persist_exists(persist_dir: Path | str) -> bool:
-    path = Path(persist_dir)
-    if not path.is_dir():
-        return False
-    try:
-        files = {p.name for p in path.iterdir()}
-    except Exception:
-        return False
-    return any(
-        filename.startswith("chroma-") or filename.startswith("index") or filename.endswith(".sqlite")
-        for filename in files
-    )
-
-
 def try_load_vectordb(persist_dir: Path) -> Chroma | None:
     try:
         return Chroma(
@@ -151,16 +163,25 @@ def try_load_vectordb(persist_dir: Path) -> Chroma | None:
         return None
 
 
-def read_size_stamp(path: Path) -> int:
+def compute_content_hash(path: Path) -> str:
+    """Compute SHA-256 hash of file contents for reliable change detection."""
     try:
-        return int(path.read_text().strip())
+        content = path.read_bytes()
+        return hashlib.sha256(content).hexdigest()
     except Exception:
-        return -1
+        return ""
 
 
-def write_size_stamp(path: Path, size: int) -> None:
+def read_hash_stamp(path: Path) -> str:
+    try:
+        return path.read_text().strip()
+    except Exception:
+        return ""
+
+
+def write_hash_stamp(path: Path, content_hash: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(str(size))
+    path.write_text(content_hash)
 
 
 def resolve_catalog_path(user_path: str | Path | None) -> Path:
@@ -195,8 +216,14 @@ def ensure_api_key() -> None:
         raise RuntimeError("Missing OPENAI_API_KEY. Set it in your environment or .env file.")
 
 
-def catalog_size(path: Path) -> int:
-    return path.stat().st_size if path.exists() else -1
+def is_persist_dir_empty(persist_dir: Path) -> bool:
+    """Check if the persist directory is empty or doesn't exist."""
+    if not persist_dir.exists():
+        return True
+    try:
+        return not any(persist_dir.iterdir())
+    except Exception:
+        return True
 
 
 def ensure_vectordb(
@@ -204,29 +231,41 @@ def ensure_vectordb(
     persist_dir: Path = PERSIST_DIR,
     force_reindex: bool = False,
 ) -> Chroma:
+    """
+    Ensure vector DB is available. Only rebuild when:
+    1. force_reindex is True
+    2. The persist directory (GCB mount) is empty
+    3. The catalog content hash has changed
+    """
     persist_dir.mkdir(parents=True, exist_ok=True)
 
-    current_size = catalog_size(catalog_path)
-    recorded_size = read_size_stamp(CATALOG_SIZE_STAMP)
+    current_hash = compute_content_hash(catalog_path)
+    recorded_hash = read_hash_stamp(CATALOG_HASH_STAMP)
 
-    needs_rebuild = force_reindex or not chroma_persist_exists(persist_dir) or current_size != recorded_size
+    # Only rebuild if: forced, folder is empty, or content hash changed
+    folder_empty = is_persist_dir_empty(persist_dir)
+    content_changed = current_hash != recorded_hash
+
+    needs_rebuild = force_reindex or folder_empty or content_changed
 
     if needs_rebuild:
         vectordb, _ = index_chunks(catalog_path, persist_dir)
-        write_size_stamp(CATALOG_SIZE_STAMP, current_size)
+        write_hash_stamp(CATALOG_HASH_STAMP, current_hash)
         return vectordb
 
+    # Try to load existing vectordb
     vectordb = try_load_vectordb(persist_dir)
     if vectordb is None:
         vectordb, _ = index_chunks(catalog_path, persist_dir)
-        write_size_stamp(CATALOG_SIZE_STAMP, current_size)
+        write_hash_stamp(CATALOG_HASH_STAMP, current_hash)
         return vectordb
 
+    # Verify the loaded vectordb is functional
     try:
         vectordb.similarity_search("probe", k=1)
     except Exception:
         vectordb, _ = index_chunks(catalog_path, persist_dir)
-        write_size_stamp(CATALOG_SIZE_STAMP, current_size)
+        write_hash_stamp(CATALOG_HASH_STAMP, current_hash)
         return vectordb
 
     return vectordb
@@ -377,13 +416,15 @@ def main() -> None:
         persist_dir = Path(args.persist_dir)
         catalog_path = resolve_catalog_path(args.json)
         _, chunk_count = index_chunks(catalog_path, persist_dir)
-        write_size_stamp(CATALOG_SIZE_STAMP, catalog_size(catalog_path))
+        content_hash = compute_content_hash(catalog_path)
+        write_hash_stamp(CATALOG_HASH_STAMP, content_hash)
         print(
             json.dumps(
                 {
                     "collection": COLLECTION_NAME,
                     "persist_dir": str(persist_dir),
                     "chunks_indexed": chunk_count,
+                    "content_hash": content_hash,
                 },
                 indent=2,
                 ensure_ascii=False,

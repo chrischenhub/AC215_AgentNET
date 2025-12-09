@@ -1,0 +1,13 @@
+config:
+  gcp:project: charlesproject-471117
+  # Service accounts - update these with your actual service account emails
+
+  security:gcp_service_account_email: agentnet215mcp@charlesproject-471117.iam.gserviceaccount.com
+  security:gcp_ksa_service_account_email: gcp-serviceagentnet@charlesproject-471117.iam.gserviceaccount.com
+  # OpenAI API Key - set this securely using: pulumi config set --secret agentnet:openai_api_key <your-key>
+
+  agentnet:openai_api_key:
+    secure: v1:2Phwoar8rDmiRal7:jgbd9UXVvAelv7Poy5eFotdESnKFic7J5SzX2zIKo7nod9eTBKhl/63HbBHvk42H5bUmJBT3TD2Z4mqVZ5NtaO6iqBJHGFGcAdZf/9yJ6IiHBgEVBtbOQrQDsc/oFtO+TSJo1RyGI0fIiwU4L7yXauVVeXq8AQ1hEV1JsjZ8K2izOCtMpjZHTV8nUxlJLlhqSoi7MNiuCd67ytSmsOWv/tBAMv3lF7LH8qbesbOU6LgBVEpP
+encryptionsalt: v1:iBRsog0rRFQ=:v1:ZcqnAzfF2HbtpToC:mJxNjyPwVq3q9IUgdR7/aP+L8tnF+w==
+
+# agentnet:openai_api_key: <set-via-pulumi-config-secret>

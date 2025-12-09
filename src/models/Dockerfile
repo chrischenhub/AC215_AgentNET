@@ -37,21 +37,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # ---------- Python deps (layer-cached) ----------
 # Install numpy first (often speeds up later builds), then the rest.
-COPY src/models/requirements.txt /app/src/models/requirements.txt
+# Note: paths are relative to build context (src/ directory)
+COPY models/requirements.txt /app/src/models/requirements.txt
 RUN pip install --upgrade pip wheel \
  && pip install --no-cache-dir numpy \
  && pip install --no-cache-dir -r /app/src/models/requirements.txt
 
-# NOTE: We do NOT COPY your source code here.
-# We'll bind-mount the repo at runtime so edits are reflected instantly.
+# Application code
+COPY models /app/src/models
 
 # ---------- Entrypoint ----------
-COPY src/models/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY models/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # switch to
 # RUN chmod +x /usr/local/bin/docker-entrypoint.sh if not working
 RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
  && chmod +x /usr/local/bin/docker-entrypoint.sh
 
+WORKDIR /app/src/models
+
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-CMD ["/bin/bash"]

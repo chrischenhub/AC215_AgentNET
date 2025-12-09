@@ -1,0 +1,9 @@
+config:
+  gcp:project: charlesproject-471117
+  # Service accounts - update these with your actual service account emails
+  security:gcp_service_account_email: agentnet215mcp@charlesproject-471117.iam.gserviceaccount.com
+  security:gcp_ksa_service_account_email: gcp-serviceagentnet@charlesproject-471117.iam.gserviceaccount.com
+  # Enable SSL for this stack
+  deploy-k8s:setupSSL: "true"
+  # OpenAI API Key - set this securely using: pulumi config set --secret agentnet:openai_api_key <your-key>
+  # agentnet:openai_api_key: <set-via-pulumi-config-secret>
