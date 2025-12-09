@@ -34,11 +34,11 @@ def test_build_server_chunks_creates_text_and_metadata() -> None:
     assert chunk.child_link == "/server/one"
 
 
-def test_chroma_persist_exists_detects_chroma_files(tmp_path: Path) -> None:
-    assert RAG.chroma_persist_exists(str(tmp_path)) is False
+def test_is_persist_dir_empty_detects_chroma_files(tmp_path: Path) -> None:
+    assert RAG.is_persist_dir_empty(tmp_path) is True
     chroma_file = tmp_path / "chroma-collections.parquet"
     chroma_file.write_text("data", encoding="utf-8")
-    assert RAG.chroma_persist_exists(str(tmp_path)) is True
+    assert RAG.is_persist_dir_empty(tmp_path) is False
 
 
 def test_score_and_rank_servers_orders_by_weight() -> None:
