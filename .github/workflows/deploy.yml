@@ -33,6 +33,15 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
 
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: charlesproject-471117
+
+      - name: Configure Docker auth for Artifact Registry
+        run: |
+          gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
       - name: Pulumi Login (GCS)
         # Login to the GCS bucket for state
         run: pulumi login ${{ env.PULUMI_BUCKET }}
