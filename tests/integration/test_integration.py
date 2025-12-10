@@ -3,9 +3,6 @@ import pytest
 from fastapi.testclient import TestClient
 from app import app
 from workflow import AgentRunEnvelope
-import fastapi.staticfiles
-import fastapi.templating
-from fastapi.responses import HTMLResponse
 
 # --- PATCHING (Should match conftest or test_app strategies if not global) ---
 # Since we are in integration tests, we might want to run against the real app,
@@ -20,6 +17,7 @@ from fastapi.responses import HTMLResponse
 # Actually 'test_app.py' patches *before* import.
 # Here we imported 'app' at the top level.
 # Let's rely on the fact that the app is already verified to load by the health check test.
+
 
 def test_health_check_integration():
     """
@@ -88,4 +86,3 @@ def test_api_execute_integration(monkeypatch: pytest.MonkeyPatch):
         assert response.status_code == 200
         data = response.json()
         assert data["final_output"] == "Integration execution successful"
-
