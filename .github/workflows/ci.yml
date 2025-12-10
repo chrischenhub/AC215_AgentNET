@@ -7,7 +7,36 @@ on:
   pull_request:
 
 jobs:
-  build-lint-test:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r src/models/requirements-dev.txt
+
+      - name: Lint
+        run: flake8 src/models tests
+
+  build-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -f src/models/Dockerfile src
+
+  unit-tests:
     runs-on: ubuntu-latest
     env:
       PYTHONPATH: src/models
@@ -20,20 +49,46 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
-          cache-dependency-path: |
-            src/models/requirements.txt
-            src/models/requirements-dev.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r src/models/requirements-dev.txt
 
-      - name: Build (byte-compile)
-        run: python -m compileall src/models
+      - name: Run Unit Tests
+        run: pytest tests/unit
 
-      - name: Lint
-        run: flake8 src/models tests
+  integration-tests:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: src/models
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-      - name: Test with coverage
-        run: pytest
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r src/models/requirements-dev.txt
+
+      - name: Run Integration Tests
+        run: pytest tests/integration --cov-fail-under=0
+
+  test-summary:
+    needs: [lint, build-image, unit-tests, integration-tests]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check status
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            echo "One or more jobs failed."
+            exit 1
+          fi
+          echo "All jobs passed."
