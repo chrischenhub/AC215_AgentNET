@@ -85,6 +85,15 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+          
+      - name: Set up gcloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: charlesproject-471117
+
+      - name: Install GKE auth plugin (and kubectl)
+        run: |
+          gcloud components install gke-gcloud-auth-plugin kubectl --quiet
 
       - name: Pulumi Login (GCS)
         run: pulumi login ${{ env.PULUMI_BUCKET }}
