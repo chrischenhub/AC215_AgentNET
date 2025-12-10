@@ -41,3 +41,8 @@ src/datapipeline/Data/
 /src/models/secrets
 .claude/
 /src/deployment/secrets
+/src/deployment/secrets/deployment.json
+/src/deployment/secrets/gcp_service.json
+/src/deployment/secrets/ssh-key-deployment
+/src/deployment/secrets/ssh-key-deployment.pub
+
