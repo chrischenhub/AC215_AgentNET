@@ -15,8 +15,16 @@ timestamp_tag = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 # Build & push the AgentNET API image using the Dockerfile that already exists in src/models.
 # The deployment docker-shell mounts the whole src tree at /workspace.
 # The Dockerfile expects the build context to be at src/ level (uses paths like "src/models/...").
-context_path = "/workspace"
-dockerfile_path = "/workspace/models/Dockerfile"
+import os
+
+# Get the directory where this Pulumi program resides (src/deployment/deploy_images)
+program_dir = os.path.dirname(os.path.abspath(__file__))
+# Calculate repo root: src/deployment/deploy_images -> src/deployment -> src -> repo_root
+repo_root = os.path.abspath(os.path.join(program_dir, "../../.."))
+
+# Build contexts are relative to repo root (or absolute paths resolved from it)
+context_path = os.path.join(repo_root, "src")  # Context covers src/ for imports
+dockerfile_path = os.path.join(repo_root, "src/models/Dockerfile")
 
 api_service_image = docker_build.Image(
     "build-agentnet-api-service",
@@ -33,13 +41,15 @@ api_service_image = docker_build.Image(
     ),
 )
 
-frontend_dockerfile_path = "/workspace/frontend-simple/Dockerfile"
+frontend_dockerfile_path = os.path.join(repo_root, "src/frontend-simple/Dockerfile")
+frontend_context_path = os.path.join(repo_root, "src/frontend-simple")
+
 frontend_image = docker_build.Image(
     "build-agentnet-frontend",
     tags=[
         pulumi.Output.concat(registry_url, "/agentnet-frontend:", timestamp_tag)
     ],
-    context=docker_build.BuildContextArgs(location="/workspace/frontend-simple"),
+    context=docker_build.BuildContextArgs(location=frontend_context_path),
     dockerfile={"location": frontend_dockerfile_path},
     platforms=[docker_build.Platform.LINUX_AMD64],
     push=True,
