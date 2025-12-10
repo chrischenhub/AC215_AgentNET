@@ -1,8 +1,37 @@
 from __future__ import annotations
 
+import sys
+from unittest.mock import MagicMock
+from pathlib import Path
+
+# --- PATCHING START ---
+# We patch FastAPI staticfiles and templating BEFORE importing app
+# because app.py instantiates them at module level, which triggers filesystem checks.
+import fastapi.staticfiles
+import fastapi.templating
+from fastapi.responses import HTMLResponse
+
+# Mock StaticFiles to avoid directory check
+class MockStaticFiles:
+    def __init__(self, directory, **kwargs):
+        pass
+    def mount(self, *args, **kwargs):
+        pass
+
+# Mock Jinja2Templates to return a valid HTMLResponse
+class MockJinja2Templates:
+    def __init__(self, directory, **kwargs):
+        pass
+    def TemplateResponse(self, name, context, **kwargs):
+        # Return a real HTMLResponse so the route handler returns something valid
+        return HTMLResponse("<html><body>Mocked</body></html>")
+
+fastapi.staticfiles.StaticFiles = MockStaticFiles
+fastapi.templating.Jinja2Templates = MockJinja2Templates
+# --- PATCHING END ---
+
 import pytest
 from fastapi.testclient import TestClient
-from pathlib import Path
 
 import app
 from workflow import AgentRunEnvelope
