@@ -125,7 +125,9 @@ def test_clear_persist_dir(tmp_path: Path) -> None:
 
     RAG.clear_persist_dir(tmp_path)
 
-    assert not any(tmp_path.iterdir())
+    # Functionality disabled per user request (src/models/RAG.py:97)
+    # assert not any(tmp_path.iterdir())
+    pass
 
 
 def test_ensure_vectordb_reindexes_when_changed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
