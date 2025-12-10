@@ -4,7 +4,7 @@ from pulumi import StackReference, ResourceOptions, Output
 import pulumi_kubernetes as k8s
 
 
-def setup_loadbalancer_ssl(namespace, k8s_provider, api_service, app_name):
+def setup_loadbalancer_ssl(namespace, k8s_provider, frontend_service, api_service, app_name):
     """
     Setup GKE Ingress with SSL/TLS using Google-managed certificates.
 
@@ -68,16 +68,26 @@ def setup_loadbalancer_ssl(namespace, k8s_provider, api_service, app_name):
                     host=host,
                     http=k8s.networking.v1.HTTPIngressRuleValueArgs(
                         paths=[
-                            # All traffic goes to the AgentNET API service
-                            # which serves both web UI and API endpoints
                             k8s.networking.v1.HTTPIngressPathArgs(
-                                path="/",
+                                path="/api",
                                 path_type="Prefix",
                                 backend=k8s.networking.v1.IngressBackendArgs(
                                     service=k8s.networking.v1.IngressServiceBackendArgs(
                                         name=api_service.metadata["name"],
                                         port=k8s.networking.v1.ServiceBackendPortArgs(
                                             number=8000,
+                                        ),
+                                    )
+                                ),
+                            ),
+                            k8s.networking.v1.HTTPIngressPathArgs(
+                                path="/",
+                                path_type="Prefix",
+                                backend=k8s.networking.v1.IngressBackendArgs(
+                                    service=k8s.networking.v1.IngressServiceBackendArgs(
+                                        name=frontend_service.metadata["name"],
+                                        port=k8s.networking.v1.ServiceBackendPortArgs(
+                                            number=8080,
                                         ),
                                     )
                                 ),

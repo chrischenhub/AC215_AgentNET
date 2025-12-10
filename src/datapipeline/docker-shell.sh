@@ -1,13 +1,22 @@
 #!/usr/bin/env bash
 set -e -o pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 IMAGE_NAME="${IMAGE_NAME:-agentnet-dvc}"
 DOCKERFILE="${DOCKERFILE:-Dockerfile.dvc-cli}"
 BUCKET="${GCS_BUCKET_NAME:-agentnet215}"
 
+if [[ "${DOCKERFILE}" != /* ]]; then
+  if [[ -f "${SCRIPT_DIR}/${DOCKERFILE}" ]]; then
+    DOCKERFILE="${SCRIPT_DIR}/${DOCKERFILE}"
+  else
+    DOCKERFILE="${REPO_ROOT}/${DOCKERFILE}"
+  fi
+fi
+
 # Default credentials location; override by exporting GOOGLE_APPLICATION_CREDENTIALS
-DEFAULT_CREDS="$ROOT_DIR/src/models/secrets/service-account.json"
+DEFAULT_CREDS="$REPO_ROOT/src/models/secrets/service-account.json"
 CREDS_PATH="${GOOGLE_APPLICATION_CREDENTIALS:-$DEFAULT_CREDS}"
 
 CREDS_ARGS=()
@@ -18,11 +27,11 @@ else
 fi
 
 echo "Building image '${IMAGE_NAME}' from ${DOCKERFILE}"
-docker build -t "${IMAGE_NAME}" -f "${ROOT_DIR}/${DOCKERFILE}" "${ROOT_DIR}"
+docker build -t "${IMAGE_NAME}" -f "${DOCKERFILE}" "${REPO_ROOT}"
 
 echo "Starting shell container (repo mounted at /app)"
 docker run --rm -ti \
-  -v "${ROOT_DIR}":/app \
+  -v "${REPO_ROOT}":/app \
   "${CREDS_ARGS[@]}" \
   -e GCS_BUCKET_NAME="${BUCKET}" \
   --cap-add SYS_ADMIN \

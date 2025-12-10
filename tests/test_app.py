@@ -8,6 +8,9 @@ import app
 from workflow import AgentRunEnvelope
 
 
+FRONTEND_SCRIPT = Path("src/frontend-simple/app.js")
+
+
 def test_index_renders_template() -> None:
     client = TestClient(app.app)
     response = client.get("/")
@@ -52,7 +55,7 @@ def test_api_execute_returns_envelope(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_frontend_resets_form_before_running() -> None:
-    script = Path("src/models/static/app.js").read_text()
+    script = FRONTEND_SCRIPT.read_text()
     submit_handler = script.index('form.addEventListener("submit"')
     reset_call = script.index("form.reset();", submit_handler)
     selected_server_branch = script.index("if (selectedServer)", submit_handler)
@@ -60,7 +63,7 @@ def test_frontend_resets_form_before_running() -> None:
 
 
 def test_render_results_hides_when_locked() -> None:
-    script = Path("src/models/static/app.js").read_text()
+    script = FRONTEND_SCRIPT.read_text()
     render_fn = script.index("const renderResults = (results) => {")
     guard = script.index("if (serverLocked)", render_fn)
     hide_call = script.index("hideResultsPanel();", guard)
@@ -71,7 +74,7 @@ def test_render_results_hides_when_locked() -> None:
 
 
 def test_agent_selection_locks_results_panel() -> None:
-    script = Path("src/models/static/app.js").read_text()
+    script = FRONTEND_SCRIPT.read_text()
     run_with_index = script.index("const runAgentWithIndex = async (index) => {")
     lock_assignment = script.index("serverLocked = true;", run_with_index)
     hide_call = script.index("hideResultsPanel();", lock_assignment)
@@ -81,7 +84,7 @@ def test_agent_selection_locks_results_panel() -> None:
 
 
 def test_reset_chat_clears_state_and_notifies() -> None:
-    script = Path("src/models/static/app.js").read_text()
+    script = FRONTEND_SCRIPT.read_text()
     reset_fn = script.index("const resetChatContext = () => {")
     clear_conversation = script.index('conversation.innerHTML = "";', reset_fn)
     clear_history = script.index("conversationHistory = [];", clear_conversation)
@@ -101,7 +104,7 @@ def test_reset_chat_clears_state_and_notifies() -> None:
 
 
 def test_reset_button_waits_if_busy() -> None:
-    script = Path("src/models/static/app.js").read_text()
+    script = FRONTEND_SCRIPT.read_text()
     handler = script.index('resetButton.addEventListener("click"', script.index("const resetChatContext"))
     busy_guard = script.index("if (isBusy)", handler)
     warn_status = script.index(

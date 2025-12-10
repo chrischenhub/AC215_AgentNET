@@ -61,7 +61,7 @@ body {
     right: 0;
     bottom: 0;
     z-index: -1;
-    background: url('bg_dark_waves.jpg') no-repeat center center fixed;
+    background: url('./assets/bg_dark_waves.jpg') no-repeat center center fixed;
     background-size: cover;
     filter: brightness(0.8);
     /* Slight dim to ensure text readability */

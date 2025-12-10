@@ -18,8 +18,8 @@ services:
   agentnet:
     <<: *agentnet-base
     build:
-      context: ../..
-      dockerfile: src/models/Dockerfile
+      context: ..
+      dockerfile: models/Dockerfile
     env_file:
       - .env
     cap_add:
@@ -34,6 +34,7 @@ services:
       - "${AGENTNET_WEB_PORT:-8000}:8000"
     environment:
       PORT: 8000
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
     command:
       [
         "uvicorn",
@@ -51,8 +52,8 @@ services:
   notion-agent:
     <<: *agentnet-base
     build:
-      context: ../..
-      dockerfile: src/models/Dockerfile
+      context: ..
+      dockerfile: models/Dockerfile
     env_file:
       - .env
     cap_add:
@@ -63,3 +64,18 @@ services:
       - apparmor:unconfined
     profiles: ["notion"]
     command: ["python", "-m", "notion_agent", "--help"]
+
+  frontend:
+    build:
+      context: ../frontend-simple
+      dockerfile: Dockerfile
+    image: ${AGENTNET_FRONTEND_IMAGE:-agentnet-frontend:latest}
+    platform: ${AGENTNET_PLATFORM:-linux/amd64}
+    environment:
+      PORT: ${AGENTNET_FRONTEND_PORT:-8080}
+      API_BASE_URL: ${AGENTNET_API_BASE_URL:-http://localhost:8000/api}
+    ports:
+      - "${AGENTNET_FRONTEND_PORT:-8080}:${AGENTNET_FRONTEND_PORT:-8080}"
+    depends_on:
+      - agentnet
+    restart: unless-stopped

@@ -39,3 +39,4 @@ src/datapipeline/Data/
 .cache
 /src/models/GCB
 /src/models/secrets
+.claude/

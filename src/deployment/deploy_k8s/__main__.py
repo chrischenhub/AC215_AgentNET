@@ -27,19 +27,19 @@ cluster, namespace, k8s_provider, ksa_name = create_cluster(
     project, region, network, subnet, app_name
 )
 
-# Setup Containers (single API service for AgentNET)
-api_service = setup_containers(
+# Setup Containers (API + Frontend for AgentNET)
+frontend_service, api_service = setup_containers(
     project, namespace, k8s_provider, ksa_name, app_name
 )
 
 # Setup Load Balancer (with or without SSL)
 if setupSSL:
     ip_address, ingress, host = setup_loadbalancer_ssl(
-        namespace, k8s_provider, api_service, app_name
+        namespace, k8s_provider, frontend_service, api_service, app_name
     )
 else:
     ip_address, ingress, host = setup_loadbalancer(
-        namespace, k8s_provider, api_service, app_name
+        namespace, k8s_provider, frontend_service, api_service, app_name
     )
 
 # Export values

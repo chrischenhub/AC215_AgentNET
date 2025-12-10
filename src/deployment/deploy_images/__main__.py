@@ -33,6 +33,24 @@ api_service_image = docker_build.Image(
     ),
 )
 
+frontend_dockerfile_path = "/workspace/frontend-simple/Dockerfile"
+frontend_image = docker_build.Image(
+    "build-agentnet-frontend",
+    tags=[
+        pulumi.Output.concat(registry_url, "/agentnet-frontend:", timestamp_tag)
+    ],
+    context=docker_build.BuildContextArgs(location="/workspace/frontend-simple"),
+    dockerfile={"location": frontend_dockerfile_path},
+    platforms=[docker_build.Platform.LINUX_AMD64],
+    push=True,
+    opts=pulumi.ResourceOptions(
+        custom_timeouts=CustomTimeouts(create="30m"),
+        retain_on_delete=True,
+    ),
+)
+
 # Export references to stack
 pulumi.export("agentnet-api-service-ref", api_service_image.ref)
 pulumi.export("agentnet-api-service-tags", api_service_image.tags)
+pulumi.export("agentnet-frontend-ref", frontend_image.ref)
+pulumi.export("agentnet-frontend-tags", frontend_image.tags)

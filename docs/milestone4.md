@@ -6,11 +6,13 @@
 ## Solution Architecture
 ![Solution architecture](../Image/solution.png)
 
-## Front End (under models/static)
+## Front End (src/frontend-simple)
 
-1. Built as a lightweight FastAPI site (`app.py`) that serves `templates/index.html` plus the static bundle in `static/app.js` and `static/styles.css`.
-2. `app.js` drives the UX: it posts to `/api/search` to fetch RAG-ranked MCP servers, renders them as selectable cards, and calls `/api/execute` to run the Notion agent against the chosen server.
-3. `styles.css` supplies the glassmorphism look-and-feel, responsive layout, and accessibility-centric focus states.
+1. Static bundle now lives under `src/frontend-simple` (HTML/CSS/JS + assets) and runs as its own container using `http-server`.
+2. Configure the backend API base via `API_BASE_URL` (defaults to `http://localhost:8000/api`); in k8s/compose point it at the AgentNet API service DNS, e.g., `http://agentnet-api:8000/api`.
+3. `app.js` drives the UX: it posts to `/api/search` to fetch RAG-ranked MCP servers, renders them as selectable cards, and calls `/api/execute` to run the Notion agent against the chosen server.
+4. `styles.css` supplies the glassmorphism look-and-feel, responsive layout, and accessibility-centric focus states.
+5. The API service exposes CORS with `FRONTEND_ORIGINS` (comma-separated origins, defaults to `*`) so the frontend container can live on a separate host/Service in k8s.
 
 ## Back End
 
@@ -44,10 +46,10 @@ Github Tags:
 - Repro users align code and data by checking out a git revision and running `dvc pull` (fetches the exact data hash referenced by that commit).
 
 ### Setup and adding a new version
-1) Run `docker-shell.sh`  
+1) Run `src/datapipeline/docker-shell.sh`  
    - From the repo root, start the dev shell that has DVC installed:  
-   - On Mac: `sh docker-shell.sh`
-   - On Windows: `bash docker-shell.sh`
+   - On Mac: `sh src/datapipeline/docker-shell.sh`
+   - On Windows: `bash src/datapipeline/docker-shell.sh`
 
 2) Initialize DVC (only if starting fresh)  
    - `dvc init`

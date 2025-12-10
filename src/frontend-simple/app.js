@@ -8,6 +8,18 @@ const resultsList = document.getElementById("results-list");
 const statusBar = document.getElementById("status-bar");
 const resetButton = document.getElementById("reset-chat");
 
+const API_BASE_URL =
+  (window.AGENTNET_CONFIG && window.AGENTNET_CONFIG.apiBaseUrl) || "/api";
+
+const buildApiUrl = (path) => {
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
+  const normalizedBase = API_BASE_URL.replace(/\/+$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${normalizedBase}${normalizedPath}`;
+};
+
 let currentInstruction = "";
 let currentResults = [];
 let activeIndex = -1;
@@ -193,8 +205,8 @@ const renderResults = (results) => {
   updateActiveResultHighlight();
 };
 
-const fetchJSON = async (url, body) => {
-  const response = await fetch(url, {
+const fetchJSON = async (path, body) => {
+  const response = await fetch(buildApiUrl(path), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -238,7 +250,7 @@ const runAgentWithServer = async (server, instruction) => {
   }
   currentInstruction = instruction;
 
-  const payload = await fetchJSON("/api/execute", {
+  const payload = await fetchJSON("/execute", {
     notion_instruction: instruction,
     child_link: server.child_link,
     server_name: server.server,
@@ -293,7 +305,7 @@ form.addEventListener("submit", async (event) => {
   setBusy(true);
 
   try {
-    const searchPayload = await fetchJSON("/api/search", {
+    const searchPayload = await fetchJSON("/search", {
       query,
       notion_instruction: query,
     });

@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # Define some environment variables
 export IMAGE_NAME="agentnet-deployment"
@@ -7,12 +7,13 @@ export IMAGE_NAME="agentnet-deployment"
 export SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export BASE_DIR="$SCRIPT_DIR"
 export WORKSPACE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)" # points to src/
+export FRONTEND_DIR="$WORKSPACE_DIR/frontend-simple"
 export SECRETS_DIR="$BASE_DIR/secrets"
-export GCP_PROJECT="charlesproject-471117" # Change to your GCP Project
-export GCP_REGION="us-central1"
-export GCP_ZONE="us-central1-a"
-export GOOGLE_APPLICATION_CREDENTIALS=/secrets/deployment.json
-export PULUMI_BUCKET="gs://$GCP_PROJECT-pulumi-state-bucket"
+export GCP_PROJECT="${GCP_PROJECT:-charlesproject-471117}" # Change to your GCP Project
+export GCP_REGION="${GCP_REGION:-us-central1}"
+export GCP_ZONE="${GCP_ZONE:-us-central1-a}"
+export GOOGLE_APPLICATION_CREDENTIALS="${GOOGLE_APPLICATION_CREDENTIALS:-/secrets/deployment.json}"
+export PULUMI_BUCKET="${PULUMI_BUCKET:-gs://${GCP_PROJECT}-pulumi-state-bucket}"
 
 # Create local Pulumi plugins directory if it doesn't exist
 mkdir -p "$BASE_DIR/pulumi-plugins"
@@ -33,6 +34,7 @@ else
         -v "$BASE_DIR":/app \
         -v "$WORKSPACE_DIR":/workspace \
         -v "$WORKSPACE_DIR/models":/models \
+        -v "$FRONTEND_DIR":/frontend-simple \
         -v "$SECRETS_DIR":/secrets \
         -v "$BASE_DIR/docker_config.json":/root/.docker/config.json \
         -v "$BASE_DIR/pulumi-plugins":/root/.pulumi/plugins \

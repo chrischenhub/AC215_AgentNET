@@ -1,37 +1,56 @@
 #!/bin/bash
+set -euo pipefail
 
-echo "Container is running!!!"
-echo "Architecture: $(uname -m)"
-echo "Environment ready! Virtual environment activated."
-echo "Python version: $(python --version)"
-echo "UV version: $(uv --version)"
+log() { printf "[deploy] %s\n" "$*"; }
+
+REQUIRED_ENVS=(
+  GOOGLE_APPLICATION_CREDENTIALS
+  GCP_PROJECT
+  GCP_REGION
+  GCP_ZONE
+  PULUMI_BUCKET
+)
+for var in "${REQUIRED_ENVS[@]}"; do
+  if [[ -z "${!var:-}" ]]; then
+    log "ERROR: $var is not set."
+    exit 1
+  fi
+done
+
+log "Container is running (arch: $(uname -m))"
+log "Python: $(python --version 2>/dev/null || echo 'missing'), uv: $(uv --version 2>/dev/null || echo 'missing')"
 
 # Ensure Python dependencies (pulumi_gcp, etc.) are present inside the container.
-# Re-syncing here guarantees modules like pulumi_gcp.compute are installed even if the image was built earlier.
 uv sync --frozen || {
-    echo "uv sync failed; attempting pip fallback for pulumi_gcp"
-    pip install --no-cache-dir pulumi-gcp>=9.3.0
+    log "uv sync failed; attempting pip fallback for pulumi_gcp"
+    pip install --no-cache-dir "pulumi-gcp>=9.3.0"
 }
 
 # Authenticate gcloud using service account
-gcloud auth activate-service-account --key-file $GOOGLE_APPLICATION_CREDENTIALS
-gcloud config set project $GCP_PROJECT
+log "Activating gcloud service account"
+gcloud auth activate-service-account --key-file "$GOOGLE_APPLICATION_CREDENTIALS"
+gcloud config set project "$GCP_PROJECT"
+gcloud config set compute/region "$GCP_REGION"
+gcloud config set compute/zone "$GCP_ZONE"
+
 # login to artifact-registry
+log "Configuring Artifact Registry Docker auth for us-central1-docker.pkg.dev"
 gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
-# Check if the bucket exists
-if ! gsutil ls -b $PULUMI_BUCKET >/dev/null 2>&1; then
-    echo "Bucket does not exist. Creating..."
-    gsutil mb -p $GCP_PROJECT $PULUMI_BUCKET
+
+# Check if the Pulumi state bucket exists
+if ! gsutil ls -b "$PULUMI_BUCKET" >/dev/null 2>&1; then
+    log "Pulumi bucket does not exist. Creating..."
+    gsutil mb -p "$GCP_PROJECT" "$PULUMI_BUCKET"
 else
-    echo "Bucket already exists. Skipping creation."
+    log "Pulumi bucket already exists. Skipping creation."
 fi
 
-echo "Logging into Pulumi using GCS bucket: $PULUMI_BUCKET"
-pulumi login $PULUMI_BUCKET
+log "Logging into Pulumi using backend: $PULUMI_BUCKET"
+pulumi login "$PULUMI_BUCKET"
 
 # List available stacks
-echo "Available Pulumi stacks in GCS:"
-gsutil ls $PULUMI_BUCKET/.pulumi/stacks/  || echo "No stacks found."
+log "Available Pulumi stacks in GCS:"
+gsutil ls "$PULUMI_BUCKET/.pulumi/stacks/"  || log "No stacks found."
 
-# Run Bash for interactive mode
-/bin/bash
+cd /app
+exec /bin/bash

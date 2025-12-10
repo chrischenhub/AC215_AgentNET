@@ -37,7 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # ---------- Python deps (layer-cached) ----------
 # Install numpy first (often speeds up later builds), then the rest.
-# Note: paths are relative to build context (src/ directory)
+# Note: paths are relative to build context (repo root)
 COPY models/requirements.txt /app/src/models/requirements.txt
 RUN pip install --upgrade pip wheel \
  && pip install --no-cache-dir numpy \

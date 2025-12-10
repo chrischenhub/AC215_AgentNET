@@ -39,9 +39,9 @@ Referring to `docs/milestone4.md` for the documentation on milestone 4
    ```
    docker compose -f src/models/docker-compose.yml up
    ```
-   And visit http://localhost:8000 
-## Front End (under models/static)states.
-Interface:
+   API: http://localhost:8000, Frontend: http://localhost:8080 (frontend defaults to hitting `http://localhost:8000/api`; override `API_BASE_URL` if you use a different host/service)
+## Front End (src/frontend-simple)
+The UI now lives in `src/frontend-simple` and ships as its own static container. Run `bash src/frontend-simple/docker-shell.sh` to build and serve it on port 8080 (override `API_BASE_URL` to point at your API service, e.g., `http://agentnet-api:8000/api` in k8s). The API service enables CORS via `FRONTEND_ORIGINS` (comma-separated; defaults to `*`). Interface:
 ![alt text](Image/frontend.png)
 
 ![alt text](Image/frontend2.png)

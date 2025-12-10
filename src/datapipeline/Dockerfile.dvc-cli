@@ -31,7 +31,7 @@ RUN set -euo pipefail \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
-COPY dvc-docker-entrypoint.sh /usr/local/bin/dvc-docker-entrypoint.sh
+COPY src/datapipeline/dvc-docker-entrypoint.sh /usr/local/bin/dvc-docker-entrypoint.sh
 RUN sed -i 's/\r$//' /usr/local/bin/dvc-docker-entrypoint.sh \
  && chmod +x /usr/local/bin/dvc-docker-entrypoint.sh
 

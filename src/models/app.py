@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 from workflow import (
@@ -21,12 +19,22 @@ from workflow import (
 )
 
 
-BASE_DIR = Path(__file__).resolve().parent
-
 app = FastAPI(title="AgentNet Web")
 
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
-app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+def _parse_origins(raw: str | None) -> list[str]:
+    if not raw:
+        return ["*"]
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
+allowed_origins = _parse_origins(os.getenv("FRONTEND_ORIGINS"))
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class SearchPayload(BaseModel):
@@ -97,8 +105,12 @@ def render_agent_response(envelope: AgentRunEnvelope) -> dict[str, Any]:
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse("index.html", {"request": request})
+async def index() -> HTMLResponse:
+    frontend_url = os.getenv("FRONTEND_URL")
+    body = "AgentNet API is running."
+    if frontend_url:
+        body += f' Frontend is served at <a href="{frontend_url}">{frontend_url}</a>.'
+    return HTMLResponse(body)
 
 
 @app.post("/api/search")

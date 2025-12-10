@@ -6,6 +6,7 @@ FROM python:3.13-slim-bullseye
 # Set the environment variable for non-interactive installations
 ENV DEBIAN_FRONTEND=noninteractive
 ENV UV_PROJECT_ENVIRONMENT=/home/app/.venv
+ENV DOCKER_DEFAULT_PLATFORM=linux/amd64
 
 # Install required dependencies
 RUN apt-get update && \
