@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from unittest.mock import MagicMock
 
 import RAG
 
@@ -89,12 +90,12 @@ def test_ensure_api_key_requires_env(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_hashing_utilities(tmp_path: Path) -> None:
     test_file = tmp_path / "test.txt"
     test_file.write_text("content", encoding="utf-8")
-    
+
     # Test compute_content_hash
     hash_val = RAG.compute_content_hash(test_file)
     assert len(hash_val) == 64  # SHA-256 hex digest length
     assert RAG.compute_content_hash(tmp_path / "nonexistent") == ""
-    
+
     # Test read/write hash stamp
     stamp_file = tmp_path / ".hash"
     RAG.write_hash_stamp(stamp_file, hash_val)
@@ -103,7 +104,7 @@ def test_hashing_utilities(tmp_path: Path) -> None:
 
 
 def test_resolution_found(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    # Test fallback resolution logic is tricky without mocking BASE_DIR, 
+    # Test fallback resolution logic is tricky without mocking BASE_DIR,
     # but we can test the explicit user path easily.
     explicit = tmp_path / "desc.json"
     explicit.touch()
@@ -121,9 +122,9 @@ def test_clear_persist_dir(tmp_path: Path) -> None:
     (tmp_path / "file.txt").touch()
     (tmp_path / "subdir").mkdir()
     (tmp_path / "subdir" / "nested.txt").touch()
-    
+
     RAG.clear_persist_dir(tmp_path)
-    
+
     assert not any(tmp_path.iterdir())
 
 
@@ -134,9 +135,9 @@ def test_ensure_vectordb_reindexes_when_changed(tmp_path: Path, monkeypatch: pyt
     monkeypatch.setattr(RAG, "compute_content_hash", lambda _: "new_hash")
     monkeypatch.setattr(RAG, "read_hash_stamp", lambda _: "old_hash")
     monkeypatch.setattr(RAG, "write_hash_stamp", MagicMock())
-    
+
     vectordb = RAG.ensure_vectordb(Path("catalog.json"), tmp_path)
-    
+
     mock_index.assert_called_once()
     assert vectordb is not None
 
@@ -146,16 +147,13 @@ def test_ensure_vectordb_skips_reindex_when_clean(tmp_path: Path, monkeypatch: p
     monkeypatch.setattr(RAG, "compute_content_hash", lambda _: "same_hash")
     monkeypatch.setattr(RAG, "read_hash_stamp", lambda _: "same_hash")
     monkeypatch.setattr(RAG, "is_persist_dir_empty", lambda _: False)
-    
+
     mock_db = MagicMock()
     # verify_functional check
     mock_db.similarity_search.return_value = []
-    
+
     monkeypatch.setattr(RAG, "try_load_vectordb", lambda _: mock_db)
     monkeypatch.setattr(RAG, "index_chunks", MagicMock(side_effect=Exception("Should not reindex")))
-    
+
     vectordb = RAG.ensure_vectordb(Path("catalog.json"), tmp_path)
     assert vectordb == mock_db
-
-
-from unittest.mock import MagicMock

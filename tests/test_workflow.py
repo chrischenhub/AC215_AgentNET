@@ -67,9 +67,9 @@ def test_rag_search_wrapper(monkeypatch: pytest.MonkeyPatch) -> None:
     # Test that the synchronous wrapper calls the RAG search
     mock_search = MagicMock(return_value=[])
     monkeypatch.setattr(workflow, "search_servers", mock_search)
-    
+
     workflow.rag_search("test query", top_servers=3)
-    
+
     mock_search.assert_called_once()
     call_args = mock_search.call_args
     assert call_args[0][0] == "test query"
@@ -83,19 +83,19 @@ async def test_execute_agent_workflow_direct_mode(monkeypatch: pytest.MonkeyPatc
     mock_completion = MagicMock()
     mock_completion.choices = [MagicMock(message=MagicMock(content="Direct response"))]
     mock_client.chat.completions.create.return_value = mock_completion
-    
+
     monkeypatch.setattr(workflow, "OpenAI", lambda: mock_client)
     monkeypatch.setattr(workflow, "ensure_api_key", lambda: None)
-    
+
     envelope = await workflow.execute_agent_workflow(
         notion_instruction="Hello",
         child_link="",  # Empty link triggers direct mode
         mode=workflow.DIRECT_MODE
     )
-    
+
     assert envelope.final_output == "Direct response"
     assert envelope.mcp_base_url is None
-    
+
     # Verify history is included if provided
     history = [{"role": "user", "content": "Hi"}]
     await workflow.execute_agent_workflow(
@@ -121,15 +121,15 @@ async def test_execute_agent_workflow_delegates_to_mcp(monkeypatch: pytest.Monke
         )
 
     monkeypatch.setattr(workflow, "execute_mcp_workflow", fake_execute_mcp)
-    
+
     history = [{"role": "user", "content": "Context"}]
     envelope = await workflow.execute_agent_workflow(
         notion_instruction="Task",
         child_link="/server/foo",
         history=history
     )
-    
-    assert envelope.final_output == "MCP response" 
+
+    assert envelope.final_output == "MCP response"
     # The instruction passed to MCP should contain the history context
     # Note: We can't easily inspect arguments of the called function without a Mock object wrapping it,
     # but we can rely on the behavior or use a Mock side_effect if we wanted to be strict.

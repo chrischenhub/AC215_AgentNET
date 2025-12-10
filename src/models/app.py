@@ -21,6 +21,7 @@ from workflow import (
 
 app = FastAPI(title="AgentNet Web")
 
+
 def _parse_origins(raw: str | None) -> list[str]:
     if not raw:
         return ["*"]
