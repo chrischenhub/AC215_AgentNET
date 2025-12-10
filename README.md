@@ -1,6 +1,5 @@
 # AgentNet RAG search + MCP Execution
-## Milestone 4 Update
-Referring to `docs/milestone4.md` for the documentation on milestone 4
+
 ## Quickstart
 
 0. Go to src/models
