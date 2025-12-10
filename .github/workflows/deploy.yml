@@ -40,6 +40,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          python -m pip install uv
           python -m pip install -r src/deployment/deploy_images/requirements.txt || true
       
       - name: Pulumi Up (Images)
@@ -77,6 +78,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          python -m pip install uv
           
       - name: Pulumi Up (K8s)
         working-directory: src/deployment/deploy_k8s
