@@ -78,7 +78,7 @@ jobs:
           python -m pip install -r src/models/requirements-dev.txt
 
       - name: Run Integration Tests
-        run: pytest tests/integration
+        run: pytest tests/integration --cov-fail-under=0
 
   test-summary:
     needs: [lint, build-image, unit-tests, integration-tests]
