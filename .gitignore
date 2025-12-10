@@ -40,3 +40,4 @@ src/datapipeline/Data/
 /src/models/GCB
 /src/models/secrets
 .claude/
+/src/deployment/secrets
