@@ -14,6 +14,7 @@ jobs:
       GOOGLE_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
       # Pulumi backend bucket (derived from project ID)
       PULUMI_BUCKET: gs://charlesproject-471117-pulumi-state-bucket
+      PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -52,6 +53,7 @@ jobs:
     env:
       GOOGLE_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
       PULUMI_BUCKET: gs://charlesproject-471117-pulumi-state-bucket
+      PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
