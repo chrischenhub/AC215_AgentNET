@@ -43,6 +43,11 @@ jobs:
           python -m pip install uv
           python -m pip install -r src/deployment/deploy_images/requirements.txt || true
       
+      - name: Setup Workspace Symlink
+        run: |
+          sudo rm -rf /workspace
+          sudo ln -s ${{ github.workspace }}/src /workspace
+
       - name: Pulumi Up (Images)
         working-directory: src/deployment/deploy_images
         run: pulumi up -s dev -y
