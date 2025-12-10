@@ -298,66 +298,7 @@ def setup_containers(project, namespace, k8s_provider, ksa_name, app_name):
         opts=pulumi.ResourceOptions(provider=k8s_provider, depends_on=[frontend_deployment]),
     )
 
-    # Autoscaling: API HPA (CPU-based)
-    api_hpa = k8s.autoscaling.v2.HorizontalPodAutoscaler(
-        "agentnet-api-hpa",
-        metadata=k8s.meta.v1.ObjectMetaArgs(
-            name="agentnet-api-hpa",
-            namespace=namespace.metadata.name,
-        ),
-        spec=k8s.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
-            scale_target_ref=k8s.autoscaling.v2.CrossVersionObjectReferenceArgs(
-                api_version="apps/v1",
-                kind="Deployment",
-                name=api_deployment.metadata["name"],
-            ),
-            min_replicas=1,
-            max_replicas=5,
-            metrics=[
-                k8s.autoscaling.v2.MetricSpecArgs(
-                    type="Resource",
-                    resource=k8s.autoscaling.v2.ResourceMetricSourceArgs(
-                        name="cpu",
-                        target=k8s.autoscaling.v2.MetricTargetArgs(
-                            type="Utilization",
-                            average_utilization=70,
-                        ),
-                    ),
-                )
-            ],
-        ),
-        opts=pulumi.ResourceOptions(provider=k8s_provider, depends_on=[api_deployment]),
-    )
+    # Autoscaling removed as per requirements
 
-    # Autoscaling: Frontend HPA (CPU-based, modest limits)
-    frontend_hpa = k8s.autoscaling.v2.HorizontalPodAutoscaler(
-        "agentnet-frontend-hpa",
-        metadata=k8s.meta.v1.ObjectMetaArgs(
-            name="agentnet-frontend-hpa",
-            namespace=namespace.metadata.name,
-        ),
-        spec=k8s.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
-            scale_target_ref=k8s.autoscaling.v2.CrossVersionObjectReferenceArgs(
-                api_version="apps/v1",
-                kind="Deployment",
-                name=frontend_deployment.metadata["name"],
-            ),
-            min_replicas=1,
-            max_replicas=3,
-            metrics=[
-                k8s.autoscaling.v2.MetricSpecArgs(
-                    type="Resource",
-                    resource=k8s.autoscaling.v2.ResourceMetricSourceArgs(
-                        name="cpu",
-                        target=k8s.autoscaling.v2.MetricTargetArgs(
-                            type="Utilization",
-                            average_utilization=60,
-                        ),
-                    ),
-                )
-            ],
-        ),
-        opts=pulumi.ResourceOptions(provider=k8s_provider, depends_on=[frontend_deployment]),
-    )
 
     return frontend_service, api_service

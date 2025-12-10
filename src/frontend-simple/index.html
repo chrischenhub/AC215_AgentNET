@@ -14,43 +14,76 @@
 <body>
     <div id="background"></div>
     <div id="app">
-        <header class="hero">
-            <!-- <div class="sparkles" aria-hidden="true">&lt;SYSTEM_READY&gt;</div> -->
-            <h1>AGENTNET</h1>
-            <!-- <p class="tagline">INITIALIZING NEURAL LINK... [OK]</p> -->
-        </header>
-
-        <main class="content">
-            <section id="conversation" aria-live="polite" aria-label="Conversation history">
-                <!-- Messages will be injected here -->
-            </section>
-
-            <section id="results-panel" class="panel hidden" aria-label="RAG search results">
-                <header class="panel-header">
-                    <h2>&gt; SELECT MCP Servers</h2>
-                    <p>AVAILABLE MCP DETECTED:</p>
-                </header>
-                <div id="results-list" class="results-list"></div>
-            </section>
-
-        </main>
-
-        <footer class="controls">
-            <form id="query-form" class="input-row" autocomplete="off">
-                <span class="prompt-char">&gt;</span>
-                <input id="query-input" name="query" type="text" placeholder=" How can I help you?"
-                    aria-label="Ask AgentNet" required>
-                <button id="submit-button" type="submit" class="send-button" aria-label="Send prompt">
+        <!-- New Sidebar -->
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h2>Try these prompts</h2>
+            </div>
+            <div class="sidebar-content">
+                <button class="sample-prompt-btn"
+                    data-prompt="Send an email to [Email address] wishing him to find a girlfriend before graduating from Harvard">
+                    <span class="icon">📧</span>
+                    <span class="label">Gmail: Send wish</span>
                 </button>
-            </form>
-
-            <div class="actions-row">
-                <div id="status-bar" role="status" aria-live="polite"></div>
-                <button id="reset-chat" type="button" class="reset-button" aria-label="Start a new chat">
-                    Reset Chat
+                <button class="sample-prompt-btn" data-prompt="List out my schedule tomorrow on my calendar">
+                    <span class="icon">📅</span>
+                    <span class="label">Calendar: Schedule</span>
+                </button>
+                <button class="sample-prompt-btn"
+                    data-prompt="Help me create a subpage for Recommendation letter template under graduate school application parent page">
+                    <span class="icon">📝</span>
+                    <span class="label">Notion: Create Page</span>
                 </button>
             </div>
-        </footer>
+            <div class="sidebar-footer">
+                <p>We also support</p>
+                <div class="integration-badges">
+                    <span class="badge">Google Task</span>
+                    <span class="badge">Microsoft Learn</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Layout Wrapper (Existing Content) -->
+        <div id="main-layout">
+            <header class="hero">
+                <!-- <div class="sparkles" aria-hidden="true">&lt;SYSTEM_READY&gt;</div> -->
+                <h1>AGENTNET</h1>
+                <!-- <p class="tagline">INITIALIZING NEURAL LINK... [OK]</p> -->
+            </header>
+
+            <main class="content">
+                <section id="conversation" aria-live="polite" aria-label="Conversation history">
+                    <!-- Messages will be injected here -->
+                </section>
+
+                <section id="results-panel" class="panel hidden" aria-label="RAG search results">
+                    <header class="panel-header">
+                        <h2>&gt; SELECT MCP Servers</h2>
+                        <p>AVAILABLE MCP DETECTED:</p>
+                    </header>
+                    <div id="results-list" class="results-list"></div>
+                </section>
+
+            </main>
+
+            <footer class="controls">
+                <form id="query-form" class="input-row" autocomplete="off">
+                    <span class="prompt-char">&gt;</span>
+                    <input id="query-input" name="query" type="text" placeholder=" How can I help you?"
+                        aria-label="Ask AgentNet" required>
+                    <button id="submit-button" type="submit" class="send-button" aria-label="Send prompt">
+                    </button>
+                </form>
+
+                <div class="actions-row">
+                    <div id="status-bar" role="status" aria-live="polite"></div>
+                    <button id="reset-chat" type="button" class="reset-button" aria-label="Start a new chat">
+                        Reset Chat
+                    </button>
+                </div>
+            </footer>
+        </div>
     </div>
 
     <script src="./config.js"></script>

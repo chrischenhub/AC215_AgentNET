@@ -1,3 +1,5 @@
 config:
   gcp:project: charlesproject-471117
+  security:gcp_service_account_email: agentnet215mcp@charlesproject-471117.iam.gserviceaccount.com
+  security:gcp_ksa_service_account_email: gcp-serviceagentnet@charlesproject-471117.iam.gserviceaccount.com
 encryptionsalt: v1:nWoLJkSIc9E=:v1:SnkPmURXWA8hEWaU:IsTNt3kjsDcTCRKoz8NVu0Ug3zxLeA==

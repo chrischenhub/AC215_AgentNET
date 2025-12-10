@@ -77,7 +77,8 @@ body {
     height: 100%;
     max-height: 90vh;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    /* Horizontal layout */
 
     /* The Material */
     background: var(--glass-surface);
@@ -107,6 +108,99 @@ body {
     #app {
         margin: 20px;
     }
+}
+
+/* Main Layout Wrapper */
+#main-layout {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Sidebar Styles */
+.sidebar {
+    width: 260px;
+    background: rgba(0, 0, 0, 0.2);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    flex-shrink: 0;
+}
+
+.sidebar-header h2 {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.sidebar-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+}
+
+.sample-prompt-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 12px;
+    color: var(--text-bright);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+}
+
+.sample-prompt-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--resin-light);
+    transform: translateX(4px);
+}
+
+.sample-prompt-btn .icon {
+    font-size: 18px;
+}
+
+.sample-prompt-btn .label {
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.sidebar-footer {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-footer p {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+}
+
+.integration-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.badge {
+    font-size: 11px;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    color: var(--text-dim);
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 /* Header - Floating inside the resin */
@@ -413,8 +507,35 @@ body {
 
 @media (max-width: 768px) {
     #app {
+        flex-direction: column;
         border-radius: 0;
         border: none;
         max-height: 100vh;
+    }
+
+    .sidebar {
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 16px;
+    }
+
+    .sidebar-content {
+        display: none;
+        /* Hide sidebar content on mobile for simplicity, or make it collapsible */
+    }
+
+    .sidebar-footer {
+        display: none;
+    }
+
+    .sidebar-header {
+        margin-bottom: 0px;
+    }
+
+    .sidebar-header h2 {
+        margin-bottom: 0px;
+        text-align: center;
     }
 }

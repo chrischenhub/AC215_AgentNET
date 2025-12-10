@@ -94,6 +94,9 @@ def clear_persist_dir(persist_dir: Path) -> None:
     This ensures a clean state - the folder is completely overwritten rather than
     accumulating old embedding files.
     """
+    # User requested to NOT delete anything in the google bucket.
+    return
+
     if not persist_dir.exists():
         return
 

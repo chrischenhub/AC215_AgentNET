@@ -337,6 +337,18 @@ submitButton.addEventListener("keydown", (event) => {
   }
 });
 
+// Sidebar interactions
+document.querySelectorAll(".sample-prompt-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const prompt = btn.dataset.prompt;
+    if (prompt) {
+      input.value = prompt;
+      input.focus();
+      // Optional: Auto-submit or just let the user edit
+    }
+  });
+});
+
 resetButton.addEventListener("click", () => {
   if (isBusy) {
     showStatus("Please wait for the current run to finish before starting over.", "error");
