@@ -106,8 +106,7 @@ Results from Notion page:
 # Solution Architecture
 ![Solution architecture](Image/solution.png)
 
-<<<<<<< HEAD
-
-
-=======
->>>>>>> 6819d2599292bc62316e133f267467aedaeb3f4c
+# Known Issues
+- The Rag search can be slow for the first time, it will be much faster after the first search.
+- The execution process is slow because we have to go through a few services.
+  
