@@ -99,9 +99,4 @@ Results from Notion page:
 
 # Solution Architecture
 ![Solution architecture](Image/solution.png)
-# 2. AgentNET MCP Server
-## Overview
-A Model Context Protocol (MCP) server that provides search and discovery capabilities for MCP servers. This server allows AI assistants to search for relevant tools and services by natural language queries.
 
-## Instruction
-See README.md under AgentNet/AgentNetMCP
