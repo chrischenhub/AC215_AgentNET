@@ -2,7 +2,8 @@
 ## Overview
 
 ## Prerequisties
-1. 
+1. Smithary AI Account
+2. Google Cloud Account
 
 ## Quickstart
 
