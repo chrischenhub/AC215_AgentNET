@@ -1,31 +1,6 @@
 # Milestone4 Documentation
 
-## Technical Architecture
-![Technical architecture](../Image/tech.png)
 
-## Solution Architecture
-![Solution architecture](../Image/solution.png)
-
-## Front End (src/frontend-simple)
-
-1. Static bundle now lives under `src/frontend-simple` (HTML/CSS/JS + assets) and runs as its own container using `http-server`.
-2. Configure the backend API base via `API_BASE_URL` (defaults to `http://localhost:8000/api`); in k8s/compose point it at the AgentNet API service DNS, e.g., `http://agentnet-api:8000/api`.
-3. `app.js` drives the UX: it posts to `/api/search` to fetch RAG-ranked MCP servers, renders them as selectable cards, and calls `/api/execute` to run the Notion agent against the chosen server.
-4. `styles.css` supplies the glassmorphism look-and-feel, responsive layout, and accessibility-centric focus states.
-5. The API service exposes CORS with `FRONTEND_ORIGINS` (comma-separated origins, defaults to `*`) so the frontend container can live on a separate host/Service in k8s.
-
-## Back End
-
-1. FastAPI service (`src/models/app.py`) mounts static assets and exposes JSON APIs: `POST /api/search` runs the catalog RAG; `POST /api/execute` triggers the MCP/Notion agent and returns both final output and raw payload.
-2. Retrieval layer (`workflow.py`, `RAG.py`) builds or loads a Chroma vector store (`persist_dir`) from the MCP catalog, supports force reindexing, and ranks servers/tools via `top_servers` and `k_tools` before handing a selection to execution.
-3. MCP execution (`workflow.py`, `notion_agent.py`) derives each MCP URL from the catalog `child_link`, invokes the Agents SDK to run the task, and returns an envelope with the MCP URL, final output, and diagnostics for the UI.
-4. Data prep scripts (`parentPageExtract.py`, `childpageextract.py`, `mcp_to_json.py`, `mcp_description_csv_to_json.py`) keep the catalog fresh; outputs are DVC-tracked so code and data stay aligned for any git revision.
-
-Interface running sample:
-
-![alt text](../Image/frontend.png)
-
-![alt text](../Image/frontend2.png)
 
 
 ## Data Versioning
@@ -90,3 +65,29 @@ We collected 20+ more new MCPs, including the MCP for Google Apps such as Gmail,
 Now, AgentNet supports, Notion, Gmail, Microsoft Learn, Google Caldendar, Google Tasks.
 ## RAG Chunking Strategy Update
 Legacy chunking in `RAG_legacy.py` embedded one chunk per tool (name/slug/params), so as MCP coverage grew and tool counts exploded the vector store ballooned and searches had to scan thousands of vectors. The new `RAG.py` collapses to one chunk per server with a `[Server: name] headline plus a concise “Use for” intent from the description`, avoiding tool-level explosion while keeping child_link for routing. That trims embeddings to roughly one chunk per MCP, so similarity search and scoring run over far fewer vectors. Ranking now needs only a small k_tools to pick top servers instead of sifting through every tool. With more MCPs onboarded the old tool-centric search was taking ~2 minutes to return results; the server-level chunking brings latency back to interactive speed.
+
+## Technical Architecture
+![Technical architecture](../Image/tech.png)
+
+## Solution Architecture
+![Solution architecture](../Image/solution.png)
+
+## Front End (src/frontend-simple)
+
+1. Static bundle now lives under `src/frontend-simple` (HTML/CSS/JS + assets) and runs as its own container using `http-server`.
+2. Configure the backend API base via `API_BASE_URL` (defaults to `http://localhost:8000/api`); in k8s/compose point it at the AgentNet API service DNS, e.g., `http://agentnet-api:8000/api`.
+3. `app.js` drives the UX: it posts to `/api/search` to fetch RAG-ranked MCP servers, renders them as selectable cards, and calls `/api/execute` to run the Notion agent against the chosen server.
+4. `styles.css` supplies the glassmorphism look-and-feel, responsive layout, and accessibility-centric focus states.
+
+## Back End
+
+1. FastAPI service (`src/models/app.py`) mounts static assets and exposes JSON APIs: `POST /api/search` runs the catalog RAG; `POST /api/execute` triggers the MCP/Notion agent and returns both final output and raw payload.
+2. Retrieval layer (`workflow.py`, `RAG.py`) builds or loads a Chroma vector store (`persist_dir`) from the MCP catalog, supports force reindexing, and ranks servers/tools via `top_servers` and `k_tools` before handing a selection to execution.
+3. MCP execution (`workflow.py`, `notion_agent.py`) derives each MCP URL from the catalog `child_link`, invokes the Agents SDK to run the task, and returns an envelope with the MCP URL, final output, and diagnostics for the UI.
+4. Data prep scripts (`parentPageExtract.py`, `childpageextract.py`, `mcp_to_json.py`, `mcp_description_csv_to_json.py`) keep the catalog fresh; outputs are DVC-tracked so code and data stay aligned for any git revision.
+
+Interface running sample:
+
+![alt text](../Image/frontend.png)
+
+![alt text](../Image/frontend2.png)
