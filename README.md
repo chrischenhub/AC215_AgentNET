@@ -1,9 +1,19 @@
 # AgentNet
 ## Overview
-
-## Prerequisties
+AgentNET turns AI agents from hard‑coded toolboxes into a search-and-execute layer: MCP is the universal plug; RAG finds the right MCP server on demand; the agent connects and runs it (e.g., discovers Gmail, drafts/sends the      
+  email).                                                                                                                                                                                                                               
+                                                                                                                                                                                                                                        
+  - Problem: Agents are “brains in jars”—smart but isolated. Hard-coding integrations doesn’t scale across thousands of tools.                                                                                                          
+  - What it does: Uses semantic search over a registry of MCP servers to suggest the best-fit tool for a natural-language goal, then executes through that server.                                                                      
+  - Backend (`src/models`): `FastAPI /api/search` (RAG over Chroma) and `/api/execute` (MCP workflow); core logic in `RAG.py`, `workflow.py`, `notion_agent.py`, CLI in `main.py`; Docker compose/entrypoint for local or container runs.             
+  - Data pipeline (`src/datapipeline`): Scrapes Smithery MCP listings (`parentPageExtract.py`, `childPageExtract.py`), normalizes to CSV/JSON (`mcp_csv_to_json.py`, `mcp_description_csv_to_json.py`), feeds RAG index.                          
+  - Frontend (`src/frontend-simple`): Static UI hitting the API; configurable API_BASE_URL; packaged with its own Dockerfile.                                                                                                             
+## Prerequisite
 1. Smithary AI Account
-2. Google Cloud Account
+2. Google Cloud Account + Google Cloud Service Account
+3. Openai Account with API key
+(Optional)
+4. Notion, Google, Microsoft accounts
 
 ## Quickstart
 
@@ -166,8 +176,8 @@ pulumi up --stack dev -y
 ```
 pulumi stack init dev
 pulumi config set gcp:project ac215-project
-pulumi config set security:gcp_service_account_email deployment@ac215-project.iam.gserviceaccount.com --stack dev
-pulumi config set security:gcp_ksa_service_account_email gcp-service@ac215-project.iam.gserviceaccount.com --stack dev
+pulumi config set security:gcp_service_account_email <service account>@<Your account>.iam.gserviceaccount.com --stack dev
+pulumi config set security:gcp_ksa_service_account_email <service account>@<Your account>.iam.gserviceaccount.com --stack dev
 ```
 This will save all your deployment states to a GCP bucket
 
@@ -261,7 +271,14 @@ Results from Notion page:
 # Solution Architecture
 ![Solution architecture](Image/solution.png)
 
+# Scalability (sr/deployment/load_test)
+![alt text](Image/scale.png)
+
+![alt text](Image/scale2.png)
+
+
 # Known Issues
 - The Rag search can be slow for the first time, it will be much faster after the first search.
 - The execution process is slow because we have to go through a few services.
+- Need to release the replica every deployment update to avoid unhealthy container. 
   
