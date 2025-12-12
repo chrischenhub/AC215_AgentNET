@@ -1,4 +1,4 @@
-# AgentNet RAG search + MCP Execution
+# AgentNet
 
 ## Quickstart
 
@@ -17,14 +17,13 @@
     SMITHERY_API_KEY = # go to https://smithery.ai/ crreate an account and retrieve the API key
    ```
 
-   In [smithery AI](https://smithery.ai/), search for Notion and complete the configuration of Notion credential. 
+   In [smithery AI](https://smithery.ai/), search for Notion, Gmail or any other tools you want to useand complete the configuration. 
 
-2. create a folder `secrets` and add the service-account.json with google cloud credential to the folder
+2. create a folder `secrets` in `src/models` and `src/deployment` and add key of your google service account.
 
-3. create a folder `GCB` to store the ChromaDB mounted from google cloud bucket.
+3. create a folder `GCB` in `src/models` to store the ChromaDB mounted from google cloud bucket.
 
-
-4. Build the image and start the stack (Postgres + dev container):
+4. Build the image and start the stack (dev container in development mode):
    ```bash
    docker compose -f src/models/docker-compose.yml up --build
    ```
@@ -34,18 +33,15 @@
    docker compose -f src/models/docker-compose.yml run --rm agentnet /bin/bash
    ```
 
-6. Directly start the webapp with Docker
+6. Directly start the webapp with Docker locally
    ```
    docker compose -f src/models/docker-compose.yml up
    ```
    API: http://localhost:8000, Frontend: http://localhost:8080 (frontend defaults to hitting `http://localhost:8000/api`; override `API_BASE_URL` if you use a different host/service)
-## Front End (src/frontend-simple)
-The UI now lives in `src/frontend-simple` and ships as its own static container. Run `bash src/frontend-simple/docker-shell.sh` to build and serve it on port 8080 (override `API_BASE_URL` to point at your API service, e.g., `http://agentnet-api:8000/api` in k8s). The API service enables CORS via `FRONTEND_ORIGINS` (comma-separated; defaults to `*`). Interface:
-![alt text](Image/frontend.png)
 
-![alt text](Image/frontend2.png)
+## Data Pipeline (src/datapipeline)
 
-## Data Pipeline
+This folder contains the data pipeline scripts to scrape MCP servers from webpage, store them in a CSV file, and convert them into a JSON file. It also include the docker container for Data Versioning. For Detailed information about DVC, please refer to [Data Versioning](docs\milestone4.md)
 
 `parentPageExtract.py`: discover and scrape smithery AI MCP parent pages using BeautifulSoup to build a list of MCP servers from smithery AI webpage (id, discovery_url, minimal metadata) and write the result to `Data/mcp_servers.csv ` and save the downloaded HTML to `Data/HTMLData` folder I(did not commit due to size limit)
 
@@ -58,6 +54,20 @@ The UI now lives in `src/frontend-simple` and ships as its own static container.
   Defaults: input `src/models/Data/mcp_description.csv`, output `src/models/Data/mcp_description.json`.
 
 `RAG.py`:  CLI to build/query a Chroma store of those descriptions. ingest embeds and persists under `src/models/GCB`, reindexing when source size changes; search loads/repairs, runs similarity search, and ranks servers by weighted retrieval score with child links. Chunking: exactly one chunk per server—cleaned HTML/whitespace, an intent sentence from the first description sentence (200-char cap), formatted as `[Server: name], Use for: intent`, then full cleaned description.
+
+## Front End (src/frontend-simple)
+The UI now lives in `src/frontend-simple` and ships as its own static container. Run `bash src/frontend-simple/docker-shell.sh` to build and serve it on port 8080. On the front end, user can enter question to search for MCP servers and let out Agent execute the reuqests. 
+![alt text](Image/frontend.png)
+1. Static bundle now lives under `src/frontend-simple` (HTML/CSS/JS + assets) and runs as its own container using `http-server`.
+2. Configure the backend API base via `API_BASE_URL` (defaults to `http://localhost:8000/api`); in k8s/compose point it at the AgentNet API service DNS, e.g., `http://agentnet-api:8000/api`.
+3. `app.js` drives the UX: it posts to `/api/search` to fetch RAG-ranked MCP servers, renders them as selectable cards, and calls `/api/execute` to run the Notion agent against the chosen server.
+4. `styles.css` supplies the glassmorphism look-and-feel, responsive layout, and accessibility-centric focus states.
+
+## Back End API Service (src/models)
+
+1. FastAPI service (`src/models/app.py`) mounts static assets and exposes JSON APIs: `POST /api/search` runs the catalog RAG; `POST /api/execute` triggers the MCP/Notion agent and returns both final output and raw payload.
+2. Retrieval layer (`workflow.py`, `RAG.py`) builds or loads a Chroma vector store (`persist_dir`) from the MCP catalog, supports force reindexing, and ranks servers/tools via `top_servers` and `k_tools` before handing a selection to execution.
+3. MCP execution (`workflow.py`, `notion_agent.py`) derives each MCP URL from the catalog `child_link`, invokes the Agents SDK to run the task, and returns an envelope with the MCP URL, final output, and diagnostics for the UI.
 
 ## RAG -> MCP workflow (Ex. Notion)
 1. `main.py`: User enter a question.For example, "I want to create a  "I want to create a SQL study plan using a notetaking tool."
@@ -84,6 +94,11 @@ Results from Notion page:
 - Tests with coverage (fails under 50% by config): `pytest`
 - GitHub Actions runs the same steps on every push/PR via `.github/workflows/ci.yml` (checkout → install deps → byte-compile → lint → pytest with coverage).
 
+# Technical Architecture
+![Technical architecture](Image/tech.png)
+
+# Solution Architecture
+![Solution architecture](Image/solution.png)
 # 2. AgentNET MCP Server
 ## Overview
 A Model Context Protocol (MCP) server that provides search and discovery capabilities for MCP servers. This server allows AI assistants to search for relevant tools and services by natural language queries.
