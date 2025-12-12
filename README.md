@@ -1,4 +1,9 @@
 # AgentNet
+## Overview
+
+## Prerequisties
+1. Smithary AI Account
+2. Google Cloud Account
 
 ## Quickstart
 
@@ -38,6 +43,7 @@
    docker compose -f src/models/docker-compose.yml up
    ```
    API: http://localhost:8000, Frontend: http://localhost:8080 (frontend defaults to hitting `http://localhost:8000/api`; override `API_BASE_URL` if you use a different host/service)
+## Deployment
 
 ## Data Pipeline (src/datapipeline)
 
@@ -69,7 +75,7 @@ The UI now lives in `src/frontend-simple` and ships as its own static container.
 2. Retrieval layer (`workflow.py`, `RAG.py`) builds or loads a Chroma vector store (`persist_dir`) from the MCP catalog, supports force reindexing, and ranks servers/tools via `top_servers` and `k_tools` before handing a selection to execution.
 3. MCP execution (`workflow.py`, `notion_agent.py`) derives each MCP URL from the catalog `child_link`, invokes the Agents SDK to run the task, and returns an envelope with the MCP URL, final output, and diagnostics for the UI.
 
-## RAG -> MCP workflow (Ex. Notion)
+## Usage Detail RAG -> MCP workflow (Ex. Notion)
 1. `main.py`: User enter a question.For example, "I want to create a  "I want to create a SQL study plan using a notetaking tool."
 
 2. `RAG.py`: mount the ChromaDB stored in google cloud bucket to the docker container and retrieve the Top 3 most relevant MCP servers that meet the user's request
@@ -81,7 +87,7 @@ Results:
 
 4. `main.py`: Prompt the user for a more detailed instruction and send to the MCP server of Notion to execute. 
 
-5. Go to the Notion and found that SQL studyn plan created successfully.
+5. Go to the Notion and found that recommendation letter template created successfully.
 Results:
 ![alt text](Image/image2.png)
 
@@ -100,3 +106,7 @@ Results from Notion page:
 # Solution Architecture
 ![Solution architecture](Image/solution.png)
 
+# Known Issues
+- The Rag search can be slow for the first time, it will be much faster after the first search.
+- The execution process is slow because we have to go through a few services.
+  
