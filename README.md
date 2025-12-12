@@ -105,5 +105,8 @@ Results from Notion page:
 # Solution Architecture
 ![Solution architecture](Image/solution.png)
 
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> 6819d2599292bc62316e133f267467aedaeb3f4c
