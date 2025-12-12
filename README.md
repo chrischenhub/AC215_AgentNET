@@ -44,6 +44,161 @@
    ```
    API: http://localhost:8000, Frontend: http://localhost:8080 (frontend defaults to hitting `http://localhost:8000/api`; override `API_BASE_URL` if you use a different host/service)
 ## Deployment
+### API's to enable in GCP before you begin
+Search for each of these in the GCP search bar and click enable to enable these API's
+* Compute Engine API
+* Service Usage API
+* Cloud Resource Manager API
+* Artifact Registry API
+
+#### Setup GCP Service Account for deployment
+- Here are the step to create a service account:
+- To setup a service account you will need to go to [GCP Console](https://console.cloud.google.com/home/dashboard), search for  "Service accounts" from the top search box. or go to: "IAM & Admins" > "Service accounts" from the top-left menu and create a new service account called "deployment". 
+- Give the following roles:
+- For `deployment`:
+    - Compute Admin
+    - Compute OS Login
+    - Artifact Registry Administrator
+    - Kubernetes Engine Admin
+    - Service Account User
+    - Storage Admin
+- Then click done.
+- This will create a service account
+- On the right "Actions" column click the vertical ... and select "Create key". A prompt for Create private key for "deployment" will appear select "JSON" and click create. This will download a Private key json file to your computer. Copy this json file into the **secrets** folder.
+- Rename the json key file to `deployment.json`
+- Follow the same process Create another service account called `gcp-service`
+- For `gcp-service` give the following roles:
+    - Storage Object Viewer
+    - Vertex AI Administrator
+    - Artifact Registry Reader
+- Then click done.
+- This will create a service account
+- On the right "Actions" column click the vertical ... and select "Create key". A prompt for Create private key for "gcp-service" will appear select "JSON" and click create. This will download a Private key json file to your computer. Copy this json file into the **secrets** folder.
+- Rename the json key file to `gcp-service.json`
+
+### Setup Docker Container (Pulumi, Docker, Kubernetes)
+
+Rather than each of you installing different tools for deployment we will use Docker to build and run a standard container will all required software.
+
+#### Run `deployment` container
+- Go into `docker-shell.sh` and change `GCP_PROJECT` to your project id
+- Run `bash src/deployment/docker-shell.sh` on windows `sh src/deployment.docker-shell.sh` on Mac 
+
+- Check versions of tools:
+```
+gcloud --version
+pulumi version
+kubectl version --client
+```
+
+- Check to make sure you are authenticated to GCP
+- Run `gcloud auth list`
+
+### SSH Setup
+#### Configuring OS Login for service account
+Run this within the `deployment` container
+```
+gcloud compute project-info add-metadata --project <YOUR GCP_PROJECT> --metadata enable-oslogin=TRUE
+```
+example: 
+```
+gcloud compute project-info add-metadata --project ac215-project --metadata enable-oslogin=TRUE
+```
+
+#### Create SSH key for service account
+```
+cd /secrets
+ssh-keygen -f ssh-key-deployment
+cd /app
+```
+
+#### Providing public SSH keys to instances
+```
+gcloud compute os-login ssh-keys add --key-file=/secrets/ssh-key-deployment.pub
+```
+### Deployment with Scaling using Kubernetes
+
+In this section we will deploy the cheese app to a K8s cluster
+
+### API's to enable in GCP for Project
+Search for each of these in the GCP search bar and click enable to enable these API's
+* Compute Engine API
+* Service Usage API
+* Cloud Resource Manager API
+* Artifact Registry API
+* Kubernetes Engine API
+
+### Start Deployment Docker Container
+-  `cd deployment`
+- Run `sh docker-shell.sh`
+- Check versions of tools
+`gcloud --version`
+`kubectl version`
+`kubectl version --client`
+
+- Check if make sure you are authenticated to GCP
+- Run `gcloud auth list`
+
+### Build and Push Docker Containers to GCR
+**This step is only required if you have NOT already done this**
+- cd into `deploy_images`
+- When setting up pulumi for the first time run:
+```
+pulumi stack init dev
+pulumi config set gcp:project ac215-project --stack dev
+```
+
+This will save all your deployment states to a GCP bucket
+
+- If a stack has already been setup, you can preview deployment using:
+```
+pulumi preview --stack dev
+```
+
+- To build & push images run (This will take a while since we need to build 3 containers):
+```
+pulumi up --stack dev -y
+```
+
+### Create & Deploy Cluster
+- cd into `deploy_k8s` from the `deployment` folder
+- When setting up pulumi for the first time run:
+```
+pulumi stack init dev
+pulumi config set gcp:project ac215-project
+pulumi config set security:gcp_service_account_email deployment@ac215-project.iam.gserviceaccount.com --stack dev
+pulumi config set security:gcp_ksa_service_account_email gcp-service@ac215-project.iam.gserviceaccount.com --stack dev
+```
+This will save all your deployment states to a GCP bucket
+
+- If a stack has already been setup, you can preview deployment using:
+```
+pulumi preview --stack dev --refresh
+```
+
+- To create a cluster and deploy all our container images run:
+```
+pulumi up --stack dev --refresh -y
+```
+
+### Update deployment
+Inside the docker run 
+```
+bash deploy.sh
+```
+
+### Debug
+If got into an error such `unready container` or `exceed context limi`, run the command below
+```
+# review the current available container
+kubectl  get pods -A -w
+
+# authenticate
+gcloud container clusters get-credentials agentnet-cluster --region us-central1 --project <Your Project Name>
+
+# release pods
+kubectl -n agentnet-namespace scale deployment agentnet-api --replicas 0
+```
 
 ## Data Pipeline (src/datapipeline)
 
