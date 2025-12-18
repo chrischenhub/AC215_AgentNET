@@ -54,6 +54,11 @@ AgentNET turns AI agents from hard‑coded toolboxes into a search-and-execute l
    ```
    API: http://localhost:8000, Frontend: http://localhost:8080 (frontend defaults to hitting `http://localhost:8000/api`; override `API_BASE_URL` if you use a different host/service)
 ## Deployment
+### Quick Start
+Run the following command to deploy the stack:
+```bash
+bash src/deployment/docker-shell.sh
+```
 ### API's to enable in GCP before you begin
 Search for each of these in the GCP search bar and click enable to enable these API's
 * Compute Engine API
